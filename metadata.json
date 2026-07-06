@@ -5,7 +5,5 @@
   "shell-version": ["50"],
   "settings-schema": "org.gnome.shell.extensions.hushlog",
   "gettext-domain": "hushlog",
-  "url": "https://github.com/gagoalaverdyan/hushlog",
-  "version": 2,
-  "version-name": "0.2"
+  "url": "https://github.com/gagoalaverdyan/hushlog"
 }

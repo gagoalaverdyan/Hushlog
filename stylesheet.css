@@ -19,9 +19,13 @@
   min-width: 430px;
 }
 
+.hushlog-history-scroll .popup-menu-item {
+  margin-right: 0.8em;
+}
+
 .hushlog-entry {
   padding: 8px 10px;
-  margin: 2px 6px 2px 0;
+  margin: 2px 0;
   border-radius: 6px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -37,6 +41,13 @@
 
 .hushlog-entry-outer {
   spacing: 10px;
+}
+
+.hushlog-app-icon {
+  icon-size: 1.35em;
+  width: 1.35em;
+  height: 1.35em;
+  margin-top: 1px;
 }
 
 .hushlog-entry-box {
@@ -120,6 +131,7 @@
 .hushlog-dialog-scroll {
   min-height: 220px;
   max-height: 560px;
+  padding-right: 0.8em;
 }
 
 .hushlog-dialog-list {

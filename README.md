@@ -8,7 +8,7 @@ Hushlog is early and open to ideas. Suggestions, bug reports, design feedback, a
 
 <img
   src="media/screenshot.png"
-  alt="Hushlog open in the GNOME top bar, showing a searchable list of recent notifications above the Private mode, History, Preferences, Sweep, and Clear history actions"
+  alt="Hushlog open in the GNOME top bar, showing a searchable list of recent notifications above the Private mode, History, Settings, Sweep, and Clear history actions"
   width="360"
 >
 
@@ -34,6 +34,8 @@ The history file lives here:
 
 The extension creates the directory automatically and tries to keep it private to your user account.
 
+If you prefer not to write notification history to disk, enable **Session only** in Settings. In that mode Hushlog keeps history in memory for the current GNOME Shell session and leaves the existing log file untouched.
+
 The default blacklist skips common sensitive apps:
 
 ```text
@@ -44,7 +46,7 @@ Bitwarden
 KeePassXC
 ```
 
-You can edit the blacklist from Preferences.
+You can edit the blacklist from Settings.
 
 ## Requirements
 
@@ -74,17 +76,18 @@ If GNOME Shell does not notice it immediately, log out and back in.
 gnome-extensions enable hushlog@gagoalaverdyan
 ```
 
-## Open Preferences
+## Open Settings
 
 ```sh
 gnome-extensions prefs hushlog@gagoalaverdyan
 ```
 
-Preferences currently include:
+Settings currently include:
 
 - How many notifications the menu shows before you open the full History view
 - Where the icon sits in the top bar (left, center, or right section, and its order within it)
 - The app/source blacklist
+- Session-only history, for keeping new notifications in memory instead of writing them to disk
 - Opening or clearing the local log file
 
 ## Test it
@@ -139,7 +142,7 @@ rm -rf ~/.local/share/hushlog
 ```text
 metadata.json                                      Extension metadata
 extension.js                                       GNOME Shell panel indicator and notification capture
-prefs.js                                           Preferences window
+prefs.js                                           Settings window
 stylesheet.css                                     Shell menu styling
 schemas/org.gnome.shell.extensions.hushlog.gschema.xml
                                                    GSettings schema

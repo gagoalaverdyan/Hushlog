@@ -20,7 +20,7 @@ export default class HushlogPreferences extends ExtensionPreferences {
         this._settingsSignals = [];
         this._blacklistRows = [];
 
-        window.set_title(_('Hushlog Preferences'));
+        window.set_title(_('Hushlog Settings'));
         window.connect('close-request', () => {
             this._disconnectSettingsSignals();
             return false;
@@ -175,6 +175,18 @@ export default class HushlogPreferences extends ExtensionPreferences {
         const group = new Adw.PreferencesGroup({
             title: _('Storage'),
         });
+
+        const sessionOnlyRow = new Adw.SwitchRow({
+            title: _('Session only'),
+            subtitle: _('Keep new history in memory only.'),
+        });
+        this._settings.bind(
+            'session-only',
+            sessionOnlyRow,
+            'active',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+        group.add(sessionOnlyRow);
 
         const pathRow = new Adw.ActionRow({
             title: _('Log file'),

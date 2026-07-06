@@ -8,9 +8,11 @@
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 import Gio from 'gi://Gio';
+import GioUnix from 'gi://GioUnix';
 import GLib from 'gi://GLib';
 import Clutter from 'gi://Clutter';
 import Pango from 'gi://Pango';
+import Shell from 'gi://Shell';
 
 import { Extension, gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -29,6 +31,8 @@ const RECENT_MEMORY_LIMIT = 50;
 const MENU_COLLAPSE_CHAR_LIMIT = 48;
 const MAX_HISTORY_ENTRIES = 500;
 const HISTORY_TRIM_BUFFER = 100;
+const APP_INFO_CACHE = new Map();
+let interfaceSettings = null;
 
 const HushlogIndicator = GObject.registerClass(
     class HushlogIndicator extends PanelMenu.Button {
@@ -77,7 +81,7 @@ const HushlogIndicator = GObject.registerClass(
             this._historyScrollSection = new PopupMenu.PopupMenuSection();
             this._historyScrollView = new St.ScrollView({
                 style_class: 'hushlog-history-scroll',
-                overlay_scrollbars: true,
+                overlay_scrollbars: false,
             });
             this._historyScrollView.add_child(this._historySection.actor);
             this._historyScrollSection.actor.add_child(this._historyScrollView);
@@ -164,7 +168,7 @@ const HushlogIndicator = GObject.registerClass(
             });
             this.menu.addMenuItem(pauseItem);
 
-            const prefsItem = new PopupMenu.PopupMenuItem(_('Preferences'));
+            const prefsItem = new PopupMenu.PopupMenuItem(_('Settings'));
             prefsItem.insert_child_at_index(createMenuIcon('preferences-system-symbolic'), 0);
             prefsItem.connect('activate', () => this._extension.openPreferencesWindow());
 
@@ -229,6 +233,8 @@ const HushlogEntryMenuItem = GObject.registerClass(
                 x_expand: true,
                 style_class: 'hushlog-entry-outer',
             });
+
+            outerBox.add_child(createAppIcon(entry));
 
             const box = new St.BoxLayout({
                 vertical: true,
@@ -376,7 +382,8 @@ export default class HushlogExtension extends Extension {
         this._seenNotificationKeys = new Set();
 
         this._connectSettings();
-        this._ensureStorage();
+        if (!this.sessionOnly)
+            this._ensureStorage();
         this._loadHistory();
 
         this._addIndicator();
@@ -426,6 +433,9 @@ export default class HushlogExtension extends Extension {
         this.recentHistory = [];
         this._seenNotificationKeys = null;
         this._settings = null;
+
+        APP_INFO_CACHE.clear();
+        interfaceSettings = null;
     }
 
     setPaused(paused) {
@@ -456,7 +466,7 @@ export default class HushlogExtension extends Extension {
                 style_class: 'hushlog-dialog-title',
             }));
 
-            const entries = this._readHistoryEntries().reverse();
+            const entries = this._historyEntriesNewestFirst();
 
             if (entries.length === 0) {
                 root.add_child(new St.Label({
@@ -476,7 +486,7 @@ export default class HushlogExtension extends Extension {
                 const scrollView = new St.ScrollView({
                     hscrollbar_policy: St.PolicyType.NEVER,
                     vscrollbar_policy: St.PolicyType.AUTOMATIC,
-                    overlay_scrollbars: true,
+                    overlay_scrollbars: false,
                     style_class: 'hushlog-dialog-scroll',
                 });
                 scrollView.add_child(list);
@@ -507,6 +517,8 @@ export default class HushlogExtension extends Extension {
             vertical: true,
             x_expand: true,
         });
+
+        row.add_child(createAppIcon(entry));
 
         const header = new St.BoxLayout({
             x_expand: true,
@@ -614,15 +626,33 @@ export default class HushlogExtension extends Extension {
         );
     }
 
+    _historyEntriesNewestFirst() {
+        if (this.sessionOnly)
+            return this.recentHistory.slice();
+
+        return this._readHistoryEntries().reverse();
+    }
+
+    _handleSessionOnlyChanged(wasSessionOnly) {
+        if (this.sessionOnly === wasSessionOnly)
+            return;
+
+        this.recentHistory = [];
+        this._seenNotificationKeys?.clear();
+        this._historyLineCount = 0;
+
+        if (!this.sessionOnly)
+            this._loadHistory();
+    }
+
     sweepHistory() {
         // Hide everything currently visible without deleting it from the log.
         this.sweepBefore = new Date().toISOString();
-        this._settings?.set_string('sweep-before', this.sweepBefore);
         this._refreshIndicator();
     }
 
     confirmClearHistory() {
-        if (this.recentHistory.length === 0 && this._readHistoryEntries().length === 0) {
+        if (this._historyEntriesNewestFirst().length === 0) {
             this.clearHistory();
             return;
         }
@@ -685,11 +715,12 @@ export default class HushlogExtension extends Extension {
 
         // A cleared log has nothing left to hide, so drop the sweep marker.
         this.sweepBefore = '';
-        this._settings?.set_string('sweep-before', '');
 
         try {
-            this._ensureStorage();
-            GLib.file_set_contents(HISTORY_FILE, '');
+            if (!this.sessionOnly) {
+                this._ensureStorage();
+                GLib.file_set_contents(HISTORY_FILE, '');
+            }
             this._historyLineCount = 0;
         } catch (error) {
             logError(error, 'Hushlog: failed to clear history file');
@@ -702,13 +733,18 @@ export default class HushlogExtension extends Extension {
         const targetLocalId = getEntryLocalId(entry);
 
         try {
-            const entries = this._readHistoryEntries()
-                .filter(item => getEntryLocalId(item) !== targetLocalId);
-            this._writeHistoryEntries(entries);
-            this.recentHistory = entries
-                .slice()
-                .reverse()
-                .slice(0, RECENT_MEMORY_LIMIT);
+            if (this.sessionOnly) {
+                this.recentHistory = this.recentHistory
+                    .filter(item => getEntryLocalId(item) !== targetLocalId);
+            } else {
+                const entries = this._readHistoryEntries()
+                    .filter(item => getEntryLocalId(item) !== targetLocalId);
+                this._writeHistoryEntries(entries);
+                this.recentHistory = entries
+                    .slice()
+                    .reverse()
+                    .slice(0, RECENT_MEMORY_LIMIT);
+            }
             this._rebuildSeenNotificationKeys();
         } catch (error) {
             logError(error, 'Hushlog: failed to delete history entry');
@@ -833,6 +869,8 @@ export default class HushlogExtension extends Extension {
             id: safeString(notification.id) || safeString(notification.residentId) || null,
             timestamp: new Date().toISOString(),
             appName,
+            appDesktopId: desktopAppIdFromName(appName) || desktopAppIdFromName(sourceTitle),
+            appIconName: iconNameFromNotification(notification, source, appName, sourceTitle),
             title,
             body: stripMarkup(body),
             urgency: safeString(notification.urgency) || null,
@@ -841,6 +879,9 @@ export default class HushlogExtension extends Extension {
     }
 
     _appendHistory(entry) {
+        if (this.sessionOnly)
+            return;
+
         try {
             this._ensureStorage();
             const file = Gio.File.new_for_path(HISTORY_FILE);
@@ -871,6 +912,12 @@ export default class HushlogExtension extends Extension {
     }
 
     _loadHistory() {
+        if (this.sessionOnly) {
+            this._historyLineCount = 0;
+            this._rebuildSeenNotificationKeys();
+            return;
+        }
+
         try {
             const file = Gio.File.new_for_path(HISTORY_FILE);
             if (!file.query_exists(null))
@@ -893,6 +940,9 @@ export default class HushlogExtension extends Extension {
     }
 
     _readHistoryEntries() {
+        if (this.sessionOnly)
+            return [];
+
         this._ensureStorage();
 
         const file = Gio.File.new_for_path(HISTORY_FILE);
@@ -917,6 +967,11 @@ export default class HushlogExtension extends Extension {
     }
 
     _writeHistoryEntries(entries) {
+        if (this.sessionOnly) {
+            this._historyLineCount = this.recentHistory.length;
+            return;
+        }
+
         this._ensureStorage();
         const text = entries.length > 0
             ? `${entries.map(entry => JSON.stringify(entry)).join('\n')}\n`
@@ -940,6 +995,7 @@ export default class HushlogExtension extends Extension {
             const file = Gio.File.new_for_path(HISTORY_FILE);
             if (!file.query_exists(null))
                 GLib.file_set_contents(HISTORY_FILE, '');
+            GLib.chmod(HISTORY_FILE, 0o600);
         } catch (error) {
             logError(error, 'Hushlog: failed to prepare storage');
         }
@@ -956,9 +1012,13 @@ export default class HushlogExtension extends Extension {
             'pause-logging',
             'denylist',
             'menu-entry-limit',
+            'session-only',
         ]) {
             const id = this._settings.connect(`changed::${key}`, () => {
+                const wasSessionOnly = this.sessionOnly;
                 this._loadSettings();
+                if (key === 'session-only')
+                    this._handleSessionOnlyChanged(wasSessionOnly);
                 this._refreshIndicator();
             });
             this._settingsSignals.push(id);
@@ -990,6 +1050,7 @@ export default class HushlogExtension extends Extension {
 
     _loadSettings() {
         this.paused = this._settings.get_boolean('pause-logging');
+        this.sessionOnly = this._settings.get_boolean('session-only');
         this.denylist = this._settings.get_strv('denylist');
         this.menuEntryLimit = clamp(
             this._settings.get_int('menu-entry-limit'),
@@ -997,7 +1058,7 @@ export default class HushlogExtension extends Extension {
             100,
             DEFAULT_MENU_ENTRY_LIMIT
         );
-        this.sweepBefore = this._settings.get_string('sweep-before');
+        this.sweepBefore ??= '';
         this.panelBox = this._settings.get_string('panel-box');
         this.panelPosition = clamp(
             this._settings.get_int('panel-position'),
@@ -1068,6 +1129,116 @@ function safeString(value) {
     }
 }
 
+function iconNameFromNotification(notification, source, appName, sourceTitle) {
+    return firstNonEmpty([
+        desktopAppIconName(appName),
+        desktopAppIconName(sourceTitle),
+        iconNameFromGIcon(source?.app?.get_app_info?.()?.get_icon?.()),
+        normalizeIconName(safeString(source?.app?.get_id?.())),
+        iconNameFromGIcon(source?.icon),
+        iconNameFromGIcon(source?.gicon),
+        normalizeIconName(safeString(source?.iconName)),
+        normalizeIconName(safeString(source?.icon_name)),
+        iconNameFromGIcon(notification?.gicon),
+        iconNameFromGIcon(notification?.icon),
+        normalizeIconName(safeString(notification?.iconName)),
+        normalizeIconName(safeString(notification?.icon_name)),
+    ]);
+}
+
+function iconNameForEntry(entry) {
+    const storedIconName = normalizeIconName(safeString(entry.appIconName));
+
+    return firstNonEmpty([
+        desktopAppIconName(entry.appName),
+        desktopAppIconName(entry.rawSourceTitle),
+        storedIconName,
+        storedIconName ? `${storedIconName}.desktop` : '',
+    ]);
+}
+
+function shellAppForEntry(entry) {
+    try {
+        const appSystem = Shell.AppSystem.get_default();
+        const storedDesktopId = safeString(entry.appDesktopId);
+        const storedIconName = normalizeIconName(safeString(entry.appIconName));
+        const desktopIds = [
+            storedDesktopId,
+            desktopAppIdFromName(entry.appName),
+            desktopAppIdFromName(entry.rawSourceTitle),
+            storedIconName ? `${storedIconName}.desktop` : '',
+        ];
+
+        for (const desktopId of desktopIds) {
+            if (!desktopId)
+                continue;
+
+            const app = appSystem.lookup_app(desktopId);
+            if (app)
+                return app;
+        }
+    } catch (error) {
+        return null;
+    }
+
+    return null;
+}
+
+function desktopAppIdFromName(name) {
+    return desktopAppInfo(name).desktopId;
+}
+
+function desktopAppIconName(name) {
+    return desktopAppInfo(name).iconName;
+}
+
+function desktopAppInfo(name) {
+    const query = safeString(name);
+    if (!query)
+        return {desktopId: '', iconName: ''};
+
+    if (APP_INFO_CACHE.has(query))
+        return APP_INFO_CACHE.get(query);
+
+    const info = {desktopId: '', iconName: ''};
+    try {
+        const results = GioUnix.DesktopAppInfo.search(query);
+        info.desktopId = results?.[0]?.[0] ?? '';
+        const appInfo = info.desktopId ? GioUnix.DesktopAppInfo.new(info.desktopId) : null;
+        info.iconName = iconNameFromGIcon(appInfo?.get_icon?.());
+    } catch (error) {
+        info.desktopId = '';
+        info.iconName = '';
+    }
+
+    APP_INFO_CACHE.set(query, info);
+    return info;
+}
+
+function iconNameFromGIcon(icon) {
+    try {
+        if (!icon)
+            return '';
+
+        if (typeof icon.get_names === 'function')
+            return firstNonEmpty(icon.get_names().map(name => normalizeIconName(safeString(name))));
+
+        return normalizeIconName(safeString(icon.to_string?.()));
+    } catch (error) {
+        return '';
+    }
+}
+
+function normalizeIconName(name) {
+    if (!name)
+        return '';
+
+    if (name.endsWith('.desktop'))
+        return name.slice(0, -'.desktop'.length);
+
+    return name;
+}
+
 function stripMarkup(text) {
     return safeString(text).replace(/<[^>]*>/g, '');
 }
@@ -1111,10 +1282,10 @@ function formatTimestamp(timestamp) {
     if (Number.isNaN(date.getTime()))
         return '';
 
-    return date.toLocaleTimeString([], {
+    return date.toLocaleTimeString([], clockAwareDateTimeOptions({
         hour: '2-digit',
         minute: '2-digit',
-    });
+    }));
 }
 
 function formatDialogTimestamp(timestamp) {
@@ -1122,13 +1293,34 @@ function formatDialogTimestamp(timestamp) {
     if (Number.isNaN(date.getTime()))
         return '';
 
-    return date.toLocaleString([], {
+    return date.toLocaleString([], clockAwareDateTimeOptions({
         year: 'numeric',
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-    });
+    }));
+}
+
+function clockAwareDateTimeOptions(options) {
+    const clockFormat = getClockFormat();
+    if (clockFormat === '12h')
+        return {...options, hour12: true};
+    if (clockFormat === '24h')
+        return {...options, hour12: false};
+
+    return options;
+}
+
+function getClockFormat() {
+    try {
+        interfaceSettings ??= new Gio.Settings({
+            schema_id: 'org.gnome.desktop.interface',
+        });
+        return interfaceSettings.get_string('clock-format');
+    } catch (error) {
+        return '';
+    }
 }
 
 function buildNotificationKey(entry) {
@@ -1154,6 +1346,22 @@ function createMenuIcon(iconName) {
         icon_name: iconName,
         style_class: 'hushlog-menu-icon',
         y_align: Clutter.ActorAlign.CENTER,
+    });
+}
+
+function createAppIcon(entry) {
+    const app = shellAppForEntry(entry);
+    if (app) {
+        const icon = app.create_icon_texture(24);
+        icon.add_style_class_name?.('hushlog-app-icon');
+        icon.y_align = Clutter.ActorAlign.START;
+        return icon;
+    }
+
+    return new St.Icon({
+        icon_name: iconNameForEntry(entry) || 'preferences-system-notifications-symbolic',
+        style_class: 'hushlog-app-icon',
+        y_align: Clutter.ActorAlign.START,
     });
 }
 

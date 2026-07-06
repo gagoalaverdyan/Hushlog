@@ -18,10 +18,10 @@
       <summary>Menu entry limit</summary>
       <description>Maximum number of recent notifications shown in the panel menu.</description>
     </key>
-    <key name="sweep-before" type="s">
-      <default>''</default>
-      <summary>Sweep marker timestamp</summary>
-      <description>Notifications logged at or before this ISO 8601 timestamp are hidden from the panel menu but kept in the history file.</description>
+    <key name="session-only" type="b">
+      <default>false</default>
+      <summary>Session-only history</summary>
+      <description>When enabled, notification history is kept in memory for the current GNOME Shell session and is not written to disk.</description>
     </key>
     <key name="panel-box" type="s">
       <choices>
