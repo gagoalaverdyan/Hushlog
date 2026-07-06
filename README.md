@@ -6,7 +6,11 @@ It is meant to feel like the "notification history" idea on Android: if a notifi
 
 Hushlog is early and open to ideas. Suggestions, bug reports, design feedback, and fix requests are welcome.
 
-![Hushlog open in the GNOME top bar, showing a searchable list of recent notifications above the Private mode, History, Preferences, Sweep, and Clear history actions](icons/screenshot.png)
+<img
+  src="media/screenshot.png"
+  alt="Hushlog open in the GNOME top bar, showing a searchable list of recent notifications above the Private mode, History, Preferences, Sweep, and Clear history actions"
+  width="360"
+>
 
 ## What it does
 
@@ -139,7 +143,8 @@ prefs.js                                           Preferences window
 stylesheet.css                                     Shell menu styling
 schemas/org.gnome.shell.extensions.hushlog.gschema.xml
                                                    GSettings schema
-icons/hushlog-symbolic.svg                         Extension icon asset
+media/screenshot.png                               README screenshot
+po/                                                Translation source files
 Makefile                                           Local install and packaging helpers
 ```
 
@@ -169,16 +174,9 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 The panel indicator is a `PanelMenu.Button` added with `Main.panel.addToStatusArea()`.
 
-Notification capture uses `Main.messageTray`. Hushlog first tries the tray-level `notification-added` signal where available. It also watches existing and newly added MessageTray sources, then listens for source-level `notification-added` and `notification-updated` signals when those are exposed.
+Notification capture uses `Main.messageTray`. Hushlog first tries the tray-level `notification-added` signal where available. It also watches newly added MessageTray sources, then listens for source-level `notification-added` and `notification-updated` signals when those are exposed.
 
-GNOME Shell MessageTray internals have changed across releases, so notification field access is intentionally defensive. If Shell 50+ changes signal names again, the extension should still load and unload cleanly, but capture may need a small adapter update in `extension.js`.
-
-## Roadmap ideas
-
-- Export/import controls for the history file.
-- A nicer first-run screen explaining privacy and blacklist behavior.
-- Better source detection for apps that expose only desktop IDs.
-- Extension review checklist for publishing on extensions.gnome.org.
+GNOME Shell MessageTray internals have changed across releases, so notification field access is intentionally defensive and signal connections are treated as optional. If Shell 50+ changes signal names again, the extension should still load and unload cleanly, but capture may need a small adapter update in `extension.js`.
 
 ## Credits
 

@@ -1,6 +1,8 @@
 # GNOME extension build artifacts
 *.shell-extension.zip
 schemas/gschemas.compiled
+schemas/gschemas.compiled.*
+locale/
 
 # Local runtime data
 .local/

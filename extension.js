@@ -12,7 +12,7 @@ import GLib from 'gi://GLib';
 import Clutter from 'gi://Clutter';
 import Pango from 'gi://Pango';
 
-import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+import { Extension, gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
@@ -115,7 +115,7 @@ const HushlogIndicator = GObject.registerClass(
             this._searchEntry = new St.Entry({
                 name: 'hushlogSearchEntry',
                 style_class: 'search-entry hushlog-search-entry',
-                hint_text: 'Search notifications...',
+                hint_text: _('Search notifications...'),
                 can_focus: true,
                 track_hover: true,
                 x_expand: true,
@@ -145,7 +145,7 @@ const HushlogIndicator = GObject.registerClass(
                 x_align: Clutter.ActorAlign.CENTER,
             }));
             emptyState.add_child(new St.Label({
-                text: 'History is empty',
+                text: _('History is empty'),
                 x_align: Clutter.ActorAlign.CENTER,
             }));
 
@@ -155,7 +155,7 @@ const HushlogIndicator = GObject.registerClass(
 
         _addActionRows(pausedOnly = false) {
             const pauseItem = new PopupMenu.PopupSwitchMenuItem(
-                'Private mode',
+                _('Private mode'),
                 this._extension.paused
             );
             pauseItem.insert_child_at_index(createMenuIcon('security-medium-symbolic'), 0);
@@ -164,7 +164,7 @@ const HushlogIndicator = GObject.registerClass(
             });
             this.menu.addMenuItem(pauseItem);
 
-            const prefsItem = new PopupMenu.PopupMenuItem('Preferences');
+            const prefsItem = new PopupMenu.PopupMenuItem(_('Preferences'));
             prefsItem.insert_child_at_index(createMenuIcon('preferences-system-symbolic'), 0);
             prefsItem.connect('activate', () => this._extension.openPreferencesWindow());
 
@@ -173,7 +173,7 @@ const HushlogIndicator = GObject.registerClass(
                 return;
             }
 
-            const showAllItem = new PopupMenu.PopupMenuItem('History');
+            const showAllItem = new PopupMenu.PopupMenuItem(_('History'));
             showAllItem.insert_child_at_index(createMenuIcon('view-list-symbolic'), 0);
             showAllItem.connect('activate', () => this._extension.openHistoryDialog());
             this.menu.addMenuItem(showAllItem);
@@ -184,14 +184,14 @@ const HushlogIndicator = GObject.registerClass(
             const hasHistory = this._extension.recentHistory.length > 0;
 
             if (hasDisplayed) {
-                const sweepItem = new PopupMenu.PopupMenuItem('Sweep');
+                const sweepItem = new PopupMenu.PopupMenuItem(_('Sweep'));
                 sweepItem.insert_child_at_index(createMenuIcon('edit-clear-all-symbolic'), 0);
                 sweepItem.connect('activate', () => this._extension.sweepHistory());
                 this.menu.addMenuItem(sweepItem);
             }
 
             if (hasHistory) {
-                const clearItem = new PopupMenu.PopupMenuItem('Clear history');
+                const clearItem = new PopupMenu.PopupMenuItem(_('Clear history'));
                 clearItem.insert_child_at_index(createMenuIcon('user-trash-symbolic'), 0);
                 clearItem.connect('activate', () => this._extension.confirmClearHistory());
                 this.menu.addMenuItem(clearItem);
@@ -242,7 +242,7 @@ const HushlogEntryMenuItem = GObject.registerClass(
             });
 
             const appLabel = new St.Label({
-                text: truncateText(entry.appName || 'Unknown app', 36),
+                text: truncateText(entry.appName || _('Unknown app'), 36),
                 x_expand: true,
                 y_align: Clutter.ActorAlign.CENTER,
                 style_class: 'hushlog-app',
@@ -293,7 +293,7 @@ const HushlogEntryMenuItem = GObject.registerClass(
                 const copyButton = new St.Button({
                     style_class: 'hushlog-entry-action',
                     can_focus: true,
-                    accessible_name: 'Copy message',
+                    accessible_name: _('Copy message'),
                     child: new St.Icon({
                         icon_name: 'edit-copy-symbolic',
                         style_class: 'system-status-icon',
@@ -309,7 +309,7 @@ const HushlogEntryMenuItem = GObject.registerClass(
             const deleteButton = new St.Button({
                 style_class: 'hushlog-entry-action',
                 can_focus: true,
-                accessible_name: 'Delete notification from history',
+                accessible_name: _('Delete notification from history'),
                 child: new St.Icon({
                     icon_name: 'edit-delete-symbolic',
                     style_class: 'system-status-icon',
@@ -428,19 +428,6 @@ export default class HushlogExtension extends Extension {
         this._settings = null;
     }
 
-    getPanelIcon() {
-        try {
-            return Gio.icon_new_for_string(GLib.build_filenamev([
-                this.path,
-                'icons',
-                'hushlog-symbolic.svg',
-            ]));
-        } catch (error) {
-            logError(error, 'Hushlog: failed to load custom panel icon');
-            return Gio.ThemedIcon.new('preferences-system-notifications-symbolic');
-        }
-    }
-
     setPaused(paused) {
         this.paused = paused;
         this._settings?.set_boolean('pause-logging', paused);
@@ -465,7 +452,7 @@ export default class HushlogExtension extends Extension {
             });
 
             root.add_child(new St.Label({
-                text: 'Notification History',
+                text: _('Notification History'),
                 style_class: 'hushlog-dialog-title',
             }));
 
@@ -473,7 +460,7 @@ export default class HushlogExtension extends Extension {
 
             if (entries.length === 0) {
                 root.add_child(new St.Label({
-                    text: 'History is empty',
+                    text: _('History is empty'),
                     style_class: 'hushlog-dialog-empty',
                     x_align: Clutter.ActorAlign.CENTER,
                 }));
@@ -498,7 +485,7 @@ export default class HushlogExtension extends Extension {
 
             this._historyDialog.contentLayout.add_child(root);
             this._historyDialog.addButton({
-                label: 'Close',
+                label: _('Close'),
                 action: () => this._historyDialog?.close(),
                 key: Clutter.KEY_Escape,
             });
@@ -526,7 +513,7 @@ export default class HushlogExtension extends Extension {
             style_class: 'hushlog-entry-header',
         });
         header.add_child(new St.Label({
-            text: truncateText(entry.appName || 'Unknown app', 48),
+            text: truncateText(entry.appName || _('Unknown app'), 48),
             x_expand: true,
             style_class: 'hushlog-app',
         }));
@@ -582,7 +569,7 @@ export default class HushlogExtension extends Extension {
             const copyButton = new St.Button({
                 style_class: 'hushlog-entry-action',
                 can_focus: true,
-                accessible_name: 'Copy message',
+                accessible_name: _('Copy message'),
                 child: new St.Icon({
                     icon_name: 'edit-copy-symbolic',
                     style_class: 'system-status-icon',
@@ -598,7 +585,7 @@ export default class HushlogExtension extends Extension {
         const deleteButton = new St.Button({
             style_class: 'hushlog-entry-action',
             can_focus: true,
-            accessible_name: 'Delete notification from history',
+            accessible_name: _('Delete notification from history'),
             child: new St.Icon({
                 icon_name: 'edit-delete-symbolic',
                 style_class: 'system-status-icon',
@@ -659,12 +646,12 @@ export default class HushlogExtension extends Extension {
                 style_class: 'hushlog-confirm-box',
             });
             messageBox.add_child(new St.Label({
-                text: 'Clear notification history?',
+                text: _('Clear notification history?'),
                 style_class: 'hushlog-confirm-title',
                 x_align: Clutter.ActorAlign.CENTER,
             }));
             messageBox.add_child(new St.Label({
-                text: 'This cannot be undone.',
+                text: _('This cannot be undone.'),
                 style_class: 'hushlog-confirm-subtitle',
                 x_align: Clutter.ActorAlign.CENTER,
             }));
@@ -672,12 +659,12 @@ export default class HushlogExtension extends Extension {
 
             dialog.setButtons([
                 {
-                    label: 'Cancel',
+                    label: _('Cancel'),
                     action: () => dialog.close(),
                     key: Clutter.KEY_Escape,
                 },
                 {
-                    label: 'Clear',
+                    label: _('Clear'),
                     action: () => {
                         dialog.close();
                         this.clearHistory();
@@ -771,8 +758,6 @@ export default class HushlogExtension extends Extension {
             console.debug(`Hushlog: notification-added unavailable: ${error.message}`);
         }
 
-        for (const source of getExistingSources(tray))
-            this._watchSource(source);
     }
 
     _watchSource(source) {
@@ -797,8 +782,6 @@ export default class HushlogExtension extends Extension {
 
         this._watchedSourceIds.set(source, signalIds);
 
-        for (const notification of getExistingNotifications(source))
-            this._captureNotification(notification, source);
     }
 
     _captureNotification(notification, fallbackSource = null) {
@@ -831,7 +814,7 @@ export default class HushlogExtension extends Extension {
             sourceTitle,
             safeString(notification.sourceName),
             safeString(notification.appName),
-        ]) || 'Unknown app';
+        ]) || _('Unknown app');
 
         const title = firstNonEmpty([
             safeString(notification.title),
@@ -1060,35 +1043,6 @@ export default class HushlogExtension extends Extension {
     _refreshIndicator() {
         this._indicator?.refresh();
     }
-}
-
-function getExistingSources(tray) {
-    if (Array.isArray(tray._sources))
-        return tray._sources;
-
-    if (tray._sources instanceof Set)
-        return [...tray._sources];
-
-    if (tray._sources instanceof Map)
-        return [...tray._sources.values()];
-
-    return [];
-}
-
-function getExistingNotifications(source) {
-    if (Array.isArray(source.notifications))
-        return source.notifications;
-
-    if (Array.isArray(source._notifications))
-        return source._notifications;
-
-    if (source.notifications instanceof Set)
-        return [...source.notifications];
-
-    if (source._notifications instanceof Set)
-        return [...source._notifications];
-
-    return [];
 }
 
 function firstNonEmpty(values) {

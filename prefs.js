@@ -6,7 +6,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk';
 
-import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+import {ExtensionPreferences, gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 const HISTORY_FILE = GLib.build_filenamev([
     GLib.get_user_data_dir(),
@@ -17,12 +17,17 @@ const HISTORY_FILE = GLib.build_filenamev([
 export default class HushlogPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         this._settings = this.getSettings();
+        this._settingsSignals = [];
         this._blacklistRows = [];
 
-        window.set_title('Hushlog Preferences');
+        window.set_title(_('Hushlog Preferences'));
+        window.connect('close-request', () => {
+            this._disconnectSettingsSignals();
+            return false;
+        });
 
         const page = new Adw.PreferencesPage({
-            title: 'Hushlog',
+            title: _('Hushlog'),
             icon_name: 'preferences-system-notifications-symbolic',
         });
 
@@ -36,24 +41,24 @@ export default class HushlogPreferences extends ExtensionPreferences {
 
     _createAboutGroup() {
         const group = new Adw.PreferencesGroup({
-            title: 'About & Credits',
+            title: _('About & Credits'),
         });
 
         group.add(this._createLinkRow(
-            'Report a bug',
-            'Open an issue on GitHub.',
+            _('Report a bug'),
+            _('Open an issue on GitHub.'),
             'https://github.com/gagoalaverdyan/Hushlog/issues'
         ));
 
         group.add(this._createLinkRow(
-            'Inspired by Clipboard Indicator',
-            'Its UI and functionality informed Hushlog’s design.',
+            _('Inspired by Clipboard Indicator'),
+            _("Its UI and functionality informed Hushlog's design."),
             'https://github.com/Tudmotu/gnome-shell-extension-clipboard-indicator'
         ));
 
         group.add(new Adw.ActionRow({
-            title: 'Icons',
-            subtitle: 'From the Adwaita / freedesktop icon set, provided by your GNOME icon theme.',
+            title: _('Icons'),
+            subtitle: _('From the Adwaita / freedesktop icon set, provided by your GNOME icon theme.'),
         }));
 
         return group;
@@ -85,12 +90,12 @@ export default class HushlogPreferences extends ExtensionPreferences {
 
     _createGeneralGroup() {
         const group = new Adw.PreferencesGroup({
-            title: 'General',
+            title: _('General'),
         });
 
         group.add(this._createSpinRow(
-            'Entries shown in menu',
-            'How many recent notifications to show before opening the History view.',
+            _('Entries shown in menu'),
+            _('How many recent notifications to show before opening the History view.'),
             'menu-entry-limit',
             1,
             100
@@ -99,8 +104,8 @@ export default class HushlogPreferences extends ExtensionPreferences {
         group.add(this._createPanelBoxRow());
 
         group.add(this._createSpinRow(
-            'Panel position',
-            'Order within the panel section. Lower sits closer to the section’s inner edge.',
+            _('Panel position'),
+            _("Order within the panel section. Lower sits closer to the section's inner edge."),
             'panel-position',
             0,
             100
@@ -112,9 +117,9 @@ export default class HushlogPreferences extends ExtensionPreferences {
     _createPanelBoxRow() {
         const boxes = ['left', 'center', 'right'];
         const row = new Adw.ComboRow({
-            title: 'Panel section',
-            subtitle: 'Which part of the top bar the icon sits in.',
-            model: Gtk.StringList.new(['Left', 'Center', 'Right']),
+            title: _('Panel section'),
+            subtitle: _('Which part of the top bar the icon sits in.'),
+            model: Gtk.StringList.new([_('Left'), _('Center'), _('Right')]),
         });
 
         const current = this._settings.get_string('panel-box');
@@ -124,28 +129,29 @@ export default class HushlogPreferences extends ExtensionPreferences {
             if (this._settings.get_string('panel-box') !== value)
                 this._settings.set_string('panel-box', value);
         });
-        this._settings.connect('changed::panel-box', () => {
+        const id = this._settings.connect('changed::panel-box', () => {
             const index = Math.max(0, boxes.indexOf(this._settings.get_string('panel-box')));
             if (row.get_selected() !== index)
                 row.set_selected(index);
         });
+        this._settingsSignals.push(id);
 
         return row;
     }
 
     _createBlacklistGroup() {
         this._blacklistGroup = new Adw.PreferencesGroup({
-            title: 'App blacklist',
-            description: 'Case-insensitive name fragments. Matching notifications stay out of the log.',
+            title: _('App blacklist'),
+            description: _('Case-insensitive name fragments. Matching notifications stay out of the log.'),
         });
 
         const addRow = new Adw.EntryRow({
-            title: 'Add app or source name',
+            title: _('Add app or source name'),
         });
 
         const addButton = new Gtk.Button({
             icon_name: 'list-add-symbolic',
-            tooltip_text: 'Add',
+            tooltip_text: _('Add'),
             valign: Gtk.Align.CENTER,
         });
         addButton.add_css_class('flat');
@@ -167,21 +173,21 @@ export default class HushlogPreferences extends ExtensionPreferences {
 
     _createStorageGroup() {
         const group = new Adw.PreferencesGroup({
-            title: 'Storage',
+            title: _('Storage'),
         });
 
         const pathRow = new Adw.ActionRow({
-            title: 'Log file',
+            title: _('Log file'),
             subtitle: HISTORY_FILE,
         });
         group.add(pathRow);
 
         const openRow = new Adw.ActionRow({
-            title: 'Open log file',
+            title: _('Open log file'),
         });
         const openButton = new Gtk.Button({
             icon_name: 'document-open-symbolic',
-            tooltip_text: 'Open',
+            tooltip_text: _('Open'),
             valign: Gtk.Align.CENTER,
         });
         openButton.add_css_class('flat');
@@ -190,11 +196,11 @@ export default class HushlogPreferences extends ExtensionPreferences {
         group.add(openRow);
 
         const clearRow = new Adw.ActionRow({
-            title: 'Clear history',
-            subtitle: 'Delete all saved notification history.',
+            title: _('Clear history'),
+            subtitle: _('Delete all saved notification history.'),
         });
         const clearButton = new Gtk.Button({
-            label: 'Clear',
+            label: _('Clear'),
             valign: Gtk.Align.CENTER,
         });
         clearButton.add_css_class('destructive-action');
@@ -223,11 +229,12 @@ export default class HushlogPreferences extends ExtensionPreferences {
         spin.connect('value-changed', () => {
             this._settings.set_int(key, spin.get_value_as_int());
         });
-        this._settings.connect(`changed::${key}`, () => {
+        const id = this._settings.connect(`changed::${key}`, () => {
             const value = this._settings.get_int(key);
             if (spin.get_value_as_int() !== value)
                 spin.set_value(value);
         });
+        this._settingsSignals.push(id);
 
         row.add_suffix(spin);
         return row;
@@ -255,7 +262,7 @@ export default class HushlogPreferences extends ExtensionPreferences {
         const denylist = this._settings.get_strv('denylist');
         if (denylist.length === 0) {
             const row = new Adw.ActionRow({
-                title: 'No blocked apps',
+                title: _('No blocked apps'),
             });
             this._blacklistRows.push(row);
             this._blacklistGroup.add(row);
@@ -269,7 +276,7 @@ export default class HushlogPreferences extends ExtensionPreferences {
 
             const removeButton = new Gtk.Button({
                 icon_name: 'edit-delete-symbolic',
-                tooltip_text: 'Remove',
+                tooltip_text: _('Remove'),
                 valign: Gtk.Align.CENTER,
             });
             removeButton.add_css_class('flat');
@@ -303,5 +310,20 @@ export default class HushlogPreferences extends ExtensionPreferences {
         } catch (error) {
             console.error(`Hushlog: failed to clear history: ${error.message}`);
         }
+    }
+
+    _disconnectSettingsSignals() {
+        if (!this._settings || !this._settingsSignals)
+            return;
+
+        for (const id of this._settingsSignals) {
+            try {
+                this._settings.disconnect(id);
+            } catch (error) {
+                console.debug(`Hushlog: failed to disconnect prefs settings signal: ${error.message}`);
+            }
+        }
+
+        this._settingsSignals = [];
     }
 }

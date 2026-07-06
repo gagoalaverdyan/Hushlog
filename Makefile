@@ -1,13 +1,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 UUID = hushlog@gagoalaverdyan
+DOMAIN = hushlog
+LINGUAS = en ru
 EXTENSION_DIR = $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 
-.PHONY: install enable disable logs test-notification
+.PHONY: install enable disable prefs package translations logs test-notification
 
-install:
+translations:
+	@for lang in $(LINGUAS); do \
+		mkdir -p "locale/$$lang/LC_MESSAGES"; \
+		msgfmt "po/$$lang.po" -o "locale/$$lang/LC_MESSAGES/$(DOMAIN).mo"; \
+	done
+
+install: translations
 	mkdir -p "$(EXTENSION_DIR)"
-	cp -r metadata.json extension.js prefs.js stylesheet.css README.md Makefile icons schemas "$(EXTENSION_DIR)/"
+	cp -r metadata.json extension.js prefs.js stylesheet.css README.md Makefile media schemas locale "$(EXTENSION_DIR)/"
 	glib-compile-schemas "$(EXTENSION_DIR)/schemas"
 
 enable:
@@ -21,7 +29,7 @@ prefs:
 
 package:
 	glib-compile-schemas schemas
-	gnome-extensions pack --force .
+	gnome-extensions pack --force --podir=po --gettext-domain="$(DOMAIN)" .
 
 logs:
 	journalctl -f /usr/bin/gnome-shell
