@@ -6,11 +6,7 @@ It is meant to feel like the "notification history" idea on Android: if a notifi
 
 Hushlog is early and open to ideas. Suggestions, bug reports, design feedback, and fix requests are welcome.
 
-<img
-  src="media/screenshot.png"
-  alt="Hushlog open in the GNOME top bar, showing a searchable list of recent notifications above the Private mode, History, Settings, Sweep, and Clear history actions"
-  width="360"
->
+![Hushlog open in the GNOME top bar, showing a searchable list of recent notifications above the Private mode, History, Settings, Sweep, and Clear history actions](media/screenshot.png)
 
 ## What it does
 
