@@ -6,15 +6,17 @@ It is meant to feel like the "notification history" idea on Android: if a notifi
 
 Hushlog is early and open to ideas. Suggestions, bug reports, design feedback, and fix requests are welcome.
 
+![Hushlog open in the GNOME top bar, showing a searchable list of recent notifications above the Private mode, History, Preferences, Sweep, and Clear history actions](icons/screenshot.png)
+
 ## What it does
 
-- Adds a compact notification-history indicator to the GNOME top bar.
-- Shows recent notifications in a searchable dropdown, with a default menu limit of 20.
-- Opens a full-history dialog when you need to look further back.
-- Stores history locally as JSON Lines.
-- Lets you pause logging when you want quiet/private time.
-- Lets you blacklist apps or notification sources.
-- Lets you delete individual entries, open the log file, or clear everything.
+- Keeps a history of your notifications so you can go back to the ones that vanished before you could read them.
+- Lives in the top bar with a search box, so finding that one notification from an hour ago is quick.
+- Keeps long notifications compact — click one to expand it and read the whole thing.
+- Copies a notification's text with one click.
+- Has a Private mode for when you'd rather not record anything, plus a blacklist for apps you never want logged.
+- Lets you sweep the list clear when it gets noisy, without actually deleting your history.
+- Keeps everything on your machine. Nothing ever leaves.
 
 ## Privacy
 
@@ -76,9 +78,10 @@ gnome-extensions prefs hushlog@gagoalaverdyan
 
 Preferences currently include:
 
-- Number of notifications shown in the menu
-- App/source blacklist
-- Open or clear the local log file
+- How many notifications the menu shows before you open the full History view
+- Where the icon sits in the top bar (left, center, or right section, and its order within it)
+- The app/source blacklist
+- Opening or clearing the local log file
 
 ## Test it
 
@@ -95,18 +98,6 @@ Watch GNOME Shell logs while testing:
 ```sh
 journalctl -f /usr/bin/gnome-shell
 ```
-
-## Reload during development
-
-After editing files:
-
-```sh
-make install
-gnome-extensions disable hushlog@gagoalaverdyan
-gnome-extensions enable hushlog@gagoalaverdyan
-```
-
-If styles, metadata, or schemas do not update, log out and back in. GNOME Shell can cache extension state pretty aggressively.
 
 ## Package
 
@@ -188,6 +179,14 @@ GNOME Shell MessageTray internals have changed across releases, so notification 
 - A nicer first-run screen explaining privacy and blacklist behavior.
 - Better source detection for apps that expose only desktop IDs.
 - Extension review checklist for publishing on extensions.gnome.org.
+
+## Credits
+
+Inspired by [Clipboard Indicator](https://github.com/Tudmotu/gnome-shell-extension-clipboard-indicator) by Tudmotu.
+
+Thanks to the Clipboard Indicator project — its UI and functionality (the clear-history confirmation dialog, scrollable history, and overall menu layout) directly informed Hushlog's design.
+
+The menu icons come from the [Adwaita](https://gitlab.gnome.org/GNOME/adwaita-icon-theme) / [freedesktop](https://specifications.freedesktop.org/icon-naming-spec/latest/) icon set, provided by your GNOME icon theme at runtime.
 
 ## License
 

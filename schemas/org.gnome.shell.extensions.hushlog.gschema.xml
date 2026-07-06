@@ -18,5 +18,26 @@
       <summary>Menu entry limit</summary>
       <description>Maximum number of recent notifications shown in the panel menu.</description>
     </key>
+    <key name="sweep-before" type="s">
+      <default>''</default>
+      <summary>Sweep marker timestamp</summary>
+      <description>Notifications logged at or before this ISO 8601 timestamp are hidden from the panel menu but kept in the history file.</description>
+    </key>
+    <key name="panel-box" type="s">
+      <choices>
+        <choice value="left"/>
+        <choice value="center"/>
+        <choice value="right"/>
+      </choices>
+      <default>'right'</default>
+      <summary>Panel box</summary>
+      <description>Which section of the top bar the Hushlog indicator sits in.</description>
+    </key>
+    <key name="panel-position" type="i">
+      <range min="0" max="100"/>
+      <default>0</default>
+      <summary>Panel position</summary>
+      <description>Index of the Hushlog indicator within its panel box. Lower values sit closer to the box's inner edge.</description>
+    </key>
   </schema>
 </schemalist>

@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Inspired by / Thanks to Clipboard Indicator by Tudmotu:
+// https://github.com/Tudmotu/gnome-shell-extension-clipboard-indicator
+// Its UI and functionality informed Hushlog's menu layout, scrollable
+// history, and clear-history confirmation dialog.
 
 import GObject from 'gi://GObject';
 import St from 'gi://St';
@@ -21,8 +26,9 @@ const HISTORY_FILE = GLib.build_filenamev([HISTORY_DIR, 'history.jsonl']);
 
 const DEFAULT_MENU_ENTRY_LIMIT = 20;
 const RECENT_MEMORY_LIMIT = 50;
-const MENU_TITLE_PREVIEW_LIMIT = 96;
-const MENU_BODY_PREVIEW_LIMIT = 180;
+const MENU_COLLAPSE_CHAR_LIMIT = 48;
+const MAX_HISTORY_ENTRIES = 500;
+const HISTORY_TRIM_BUFFER = 100;
 
 const HushlogIndicator = GObject.registerClass(
     class HushlogIndicator extends PanelMenu.Button {
@@ -62,7 +68,7 @@ const HushlogIndicator = GObject.registerClass(
                 return;
             }
 
-            const entries = this._extension.recentHistory.slice(0, this._extension.menuEntryLimit);
+            const entries = this._extension.displayedHistory.slice(0, this._extension.menuEntryLimit);
 
             if (entries.length > 0)
                 this._addSearchRow();
@@ -139,7 +145,7 @@ const HushlogIndicator = GObject.registerClass(
                 x_align: Clutter.ActorAlign.CENTER,
             }));
             emptyState.add_child(new St.Label({
-                text: 'No notifications yet',
+                text: 'History is empty',
                 x_align: Clutter.ActorAlign.CENTER,
             }));
 
@@ -149,7 +155,7 @@ const HushlogIndicator = GObject.registerClass(
 
         _addActionRows(pausedOnly = false) {
             const pauseItem = new PopupMenu.PopupSwitchMenuItem(
-                'Pause logging',
+                'Private mode',
                 this._extension.paused
             );
             pauseItem.insert_child_at_index(createMenuIcon('security-medium-symbolic'), 0);
@@ -167,17 +173,29 @@ const HushlogIndicator = GObject.registerClass(
                 return;
             }
 
-            const showAllItem = new PopupMenu.PopupMenuItem('Full history');
+            const showAllItem = new PopupMenu.PopupMenuItem('History');
             showAllItem.insert_child_at_index(createMenuIcon('view-list-symbolic'), 0);
             showAllItem.connect('activate', () => this._extension.openHistoryDialog());
             this.menu.addMenuItem(showAllItem);
 
             this.menu.addMenuItem(prefsItem);
 
-            const clearItem = new PopupMenu.PopupMenuItem('Clear history');
-            clearItem.insert_child_at_index(createMenuIcon('user-trash-symbolic'), 0);
-            clearItem.connect('activate', () => this._extension.confirmClearHistory());
-            this.menu.addMenuItem(clearItem);
+            const hasDisplayed = this._extension.displayedHistory.length > 0;
+            const hasHistory = this._extension.recentHistory.length > 0;
+
+            if (hasDisplayed) {
+                const sweepItem = new PopupMenu.PopupMenuItem('Sweep');
+                sweepItem.insert_child_at_index(createMenuIcon('edit-clear-all-symbolic'), 0);
+                sweepItem.connect('activate', () => this._extension.sweepHistory());
+                this.menu.addMenuItem(sweepItem);
+            }
+
+            if (hasHistory) {
+                const clearItem = new PopupMenu.PopupMenuItem('Clear history');
+                clearItem.insert_child_at_index(createMenuIcon('user-trash-symbolic'), 0);
+                clearItem.connect('activate', () => this._extension.confirmClearHistory());
+                this.menu.addMenuItem(clearItem);
+            }
         }
 
         _syncPausedStyle() {
@@ -240,12 +258,18 @@ const HushlogEntryMenuItem = GObject.registerClass(
 
             box.add_child(header);
 
-            this._titleLabel = createEntryLabel({
-                text: this._titleText(),
-                x_expand: true,
-                style_class: 'hushlog-title',
-            });
-            box.add_child(this._titleLabel);
+            // Only render a title row when there is a title, or when there is
+            // nothing else to show. This avoids an empty "(untitled)" line for
+            // body-only notifications.
+            if (safeString(entry.title) || !safeString(entry.body)) {
+                this._titleLabel = createEntryLabel({
+                    text: this._titleText(),
+                    x_expand: true,
+                    style_class: 'hushlog-title',
+                });
+                this._setLabelCollapsed(this._titleLabel, true);
+                box.add_child(this._titleLabel);
+            }
 
             if (entry.body) {
                 this._bodyLabel = createEntryLabel({
@@ -253,33 +277,33 @@ const HushlogEntryMenuItem = GObject.registerClass(
                     x_expand: true,
                     style_class: 'hushlog-body',
                 });
+                this._setLabelCollapsed(this._bodyLabel, true);
                 box.add_child(this._bodyLabel);
             }
 
             outerBox.add_child(box);
 
             const actionsBox = new St.BoxLayout({
-                vertical: true,
+                vertical: false,
                 y_align: Clutter.ActorAlign.CENTER,
                 style_class: 'hushlog-entry-actions',
             });
 
-            if (this._hasLongContent) {
-                this._expandIcon = new St.Icon({
-                    icon_name: 'pan-down-symbolic',
-                    style_class: 'system-status-icon',
-                });
-                const expandButton = new St.Button({
+            if (entryMessageText(entry)) {
+                const copyButton = new St.Button({
                     style_class: 'hushlog-entry-action',
                     can_focus: true,
-                    accessible_name: 'Expand notification',
-                    child: this._expandIcon,
+                    accessible_name: 'Copy message',
+                    child: new St.Icon({
+                        icon_name: 'edit-copy-symbolic',
+                        style_class: 'system-status-icon',
+                    }),
                     x_expand: false,
                     y_expand: false,
                     y_align: Clutter.ActorAlign.CENTER,
                 });
-                expandButton.connect('clicked', () => this._toggleExpanded());
-                actionsBox.add_child(expandButton);
+                copyButton.connect('clicked', () => copyMessage(entry));
+                actionsBox.add_child(copyButton);
             }
 
             const deleteButton = new St.Button({
@@ -301,29 +325,43 @@ const HushlogEntryMenuItem = GObject.registerClass(
             outerBox.add_child(actionsBox);
 
             this.add_child(outerBox);
+
+            // Clicking the entry expands/collapses long content in place.
+            if (this._hasLongContent)
+                this.add_style_class_name('hushlog-entry-expandable');
+        }
+
+        // PopupBaseMenuItem calls activate() on click and on Enter/Space. We
+        // override it so long entries toggle in place and the menu stays open
+        // (we intentionally do not emit 'activate', which would close the menu).
+        activate(event) {
+            if (this._hasLongContent) {
+                this._toggleExpanded();
+                return;
+            }
+
+            super.activate(event);
         }
 
         _toggleExpanded() {
             this._expanded = !this._expanded;
-            this._titleLabel.set_text(this._titleText());
-            this._bodyLabel?.set_text(this._bodyText());
-            this._expandIcon.icon_name = this._expanded
-                ? 'pan-up-symbolic'
-                : 'pan-down-symbolic';
+            if (this._titleLabel)
+                this._setLabelCollapsed(this._titleLabel, !this._expanded);
+            if (this._bodyLabel)
+                this._setLabelCollapsed(this._bodyLabel, !this._expanded);
+            return this._expanded;
+        }
+
+        _setLabelCollapsed(label, collapsed) {
+            setLabelCollapsed(label, collapsed);
         }
 
         _titleText() {
-            const title = this._entry.title || '(untitled)';
-            return this._expanded
-                ? title
-                : truncateText(title, MENU_TITLE_PREVIEW_LIMIT);
+            return this._entry.title || '(untitled)';
         }
 
         _bodyText() {
-            const body = this._entry.body || '';
-            return this._expanded
-                ? body
-                : truncateText(body, MENU_BODY_PREVIEW_LIMIT);
+            return this._entry.body || '';
         }
     });
 
@@ -341,11 +379,29 @@ export default class HushlogExtension extends Extension {
         this._ensureStorage();
         this._loadHistory();
 
-        this._indicator = new HushlogIndicator(this);
-        Main.panel.addToStatusArea(this.uuid, this._indicator);
+        this._addIndicator();
 
         this._connectMessageTray();
         this._refreshIndicator();
+    }
+
+    _addIndicator() {
+        this._indicator = new HushlogIndicator(this);
+        Main.panel.addToStatusArea(
+            this.uuid,
+            this._indicator,
+            this.panelPosition,
+            this.panelBox
+        );
+    }
+
+    _relocateIndicator() {
+        if (!this._indicator)
+            return;
+
+        this._indicator.destroy();
+        this._indicator = null;
+        this._addIndicator();
     }
 
     disable() {
@@ -417,7 +473,7 @@ export default class HushlogExtension extends Extension {
 
             if (entries.length === 0) {
                 root.add_child(new St.Label({
-                    text: 'No notifications yet',
+                    text: 'History is empty',
                     style_class: 'hushlog-dialog-empty',
                     x_align: Clutter.ActorAlign.CENTER,
                 }));
@@ -456,6 +512,8 @@ export default class HushlogExtension extends Extension {
         const row = new St.BoxLayout({
             style_class: 'hushlog-dialog-entry',
             x_expand: true,
+            reactive: true,
+            track_hover: true,
         });
 
         const textBox = new St.BoxLayout({
@@ -478,19 +536,64 @@ export default class HushlogExtension extends Extension {
         }));
         textBox.add_child(header);
 
-        textBox.add_child(createEntryLabel({
-            text: entry.title || '(untitled)',
-            style_class: 'hushlog-title',
-        }));
+        let titleLabel = null;
+        if (safeString(entry.title) || !safeString(entry.body)) {
+            titleLabel = createEntryLabel({
+                text: entry.title || '(untitled)',
+                style_class: 'hushlog-title',
+            });
+            setLabelCollapsed(titleLabel, true);
+            textBox.add_child(titleLabel);
+        }
 
+        let bodyLabel = null;
         if (entry.body) {
-            textBox.add_child(createEntryLabel({
+            bodyLabel = createEntryLabel({
                 text: entry.body,
                 style_class: 'hushlog-body',
-            }));
+            });
+            setLabelCollapsed(bodyLabel, true);
+            textBox.add_child(bodyLabel);
         }
 
         row.add_child(textBox);
+
+        const actionsBox = new St.BoxLayout({
+            vertical: false,
+            y_align: Clutter.ActorAlign.CENTER,
+            style_class: 'hushlog-entry-actions',
+        });
+
+        // Clicking the row expands/collapses long content in place.
+        if (isLongEntry(entry)) {
+            let expanded = false;
+            row.add_style_class_name('hushlog-entry-expandable');
+            row.connect('button-release-event', () => {
+                expanded = !expanded;
+                if (titleLabel)
+                    setLabelCollapsed(titleLabel, !expanded);
+                if (bodyLabel)
+                    setLabelCollapsed(bodyLabel, !expanded);
+                return Clutter.EVENT_STOP;
+            });
+        }
+
+        if (entryMessageText(entry)) {
+            const copyButton = new St.Button({
+                style_class: 'hushlog-entry-action',
+                can_focus: true,
+                accessible_name: 'Copy message',
+                child: new St.Icon({
+                    icon_name: 'edit-copy-symbolic',
+                    style_class: 'system-status-icon',
+                }),
+                x_expand: false,
+                y_expand: false,
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+            copyButton.connect('clicked', () => copyMessage(entry));
+            actionsBox.add_child(copyButton);
+        }
 
         const deleteButton = new St.Button({
             style_class: 'hushlog-entry-action',
@@ -508,9 +611,27 @@ export default class HushlogExtension extends Extension {
             this.deleteHistoryEntry(entry);
             row.destroy();
         });
-        row.add_child(deleteButton);
+        actionsBox.add_child(deleteButton);
+
+        row.add_child(actionsBox);
 
         return row;
+    }
+
+    get displayedHistory() {
+        if (!this.sweepBefore)
+            return this.recentHistory;
+
+        return this.recentHistory.filter(
+            entry => safeString(entry.timestamp) > this.sweepBefore
+        );
+    }
+
+    sweepHistory() {
+        // Hide everything currently visible without deleting it from the log.
+        this.sweepBefore = new Date().toISOString();
+        this._settings?.set_string('sweep-before', this.sweepBefore);
+        this._refreshIndicator();
     }
 
     confirmClearHistory() {
@@ -575,9 +696,14 @@ export default class HushlogExtension extends Extension {
         this.recentHistory = [];
         this._seenNotificationKeys?.clear();
 
+        // A cleared log has nothing left to hide, so drop the sweep marker.
+        this.sweepBefore = '';
+        this._settings?.set_string('sweep-before', '');
+
         try {
             this._ensureStorage();
             GLib.file_set_contents(HISTORY_FILE, '');
+            this._historyLineCount = 0;
         } catch (error) {
             logError(error, 'Hushlog: failed to clear history file');
         }
@@ -742,9 +868,23 @@ export default class HushlogExtension extends Extension {
             const line = `${JSON.stringify(entry)}\n`;
             stream.write_all(new TextEncoder().encode(line), null);
             stream.close(null);
+
+            this._historyLineCount = (this._historyLineCount ?? this._readHistoryEntries().length) + 1;
+            if (this._historyLineCount > MAX_HISTORY_ENTRIES + HISTORY_TRIM_BUFFER)
+                this._trimHistoryFile();
         } catch (error) {
             logError(error, 'Hushlog: failed to append notification history');
         }
+    }
+
+    _trimHistoryFile() {
+        const entries = this._readHistoryEntries();
+        if (entries.length <= MAX_HISTORY_ENTRIES) {
+            this._historyLineCount = entries.length;
+            return;
+        }
+
+        this._writeHistoryEntries(entries.slice(entries.length - MAX_HISTORY_ENTRIES));
     }
 
     _loadHistory() {
@@ -753,11 +893,16 @@ export default class HushlogExtension extends Extension {
             if (!file.query_exists(null))
                 return;
 
-            this.recentHistory = this._readHistoryEntries()
+            const entries = this._readHistoryEntries();
+            this._historyLineCount = entries.length;
+            this.recentHistory = entries
                 .reverse()
                 .slice(0, RECENT_MEMORY_LIMIT);
 
             this._rebuildSeenNotificationKeys();
+
+            if (this._historyLineCount > MAX_HISTORY_ENTRIES + HISTORY_TRIM_BUFFER)
+                this._trimHistoryFile();
         } catch (error) {
             logError(error, 'Hushlog: failed to load notification history');
             this.recentHistory = [];
@@ -794,6 +939,7 @@ export default class HushlogExtension extends Extension {
             ? `${entries.map(entry => JSON.stringify(entry)).join('\n')}\n`
             : '';
         GLib.file_set_contents(HISTORY_FILE, text);
+        this._historyLineCount = entries.length;
     }
 
     _rebuildSeenNotificationKeys() {
@@ -834,6 +980,14 @@ export default class HushlogExtension extends Extension {
             });
             this._settingsSignals.push(id);
         }
+
+        for (const key of ['panel-box', 'panel-position']) {
+            const id = this._settings.connect(`changed::${key}`, () => {
+                this._loadSettings();
+                this._relocateIndicator();
+            });
+            this._settingsSignals.push(id);
+        }
     }
 
     _disconnectSettings() {
@@ -859,6 +1013,14 @@ export default class HushlogExtension extends Extension {
             1,
             100,
             DEFAULT_MENU_ENTRY_LIMIT
+        );
+        this.sweepBefore = this._settings.get_string('sweep-before');
+        this.panelBox = this._settings.get_string('panel-box');
+        this.panelPosition = clamp(
+            this._settings.get_int('panel-position'),
+            0,
+            100,
+            0
         );
     }
 
@@ -965,8 +1127,29 @@ function truncateText(text, limit) {
 }
 
 function isLongEntry(entry) {
-    return safeString(entry.title).replace(/\s+/g, ' ').length > MENU_TITLE_PREVIEW_LIMIT ||
-        safeString(entry.body).replace(/\s+/g, ' ').length > MENU_BODY_PREVIEW_LIMIT;
+    return isMultilineOrLong(entry.title) || isMultilineOrLong(entry.body);
+}
+
+function isMultilineOrLong(text) {
+    const value = safeString(text);
+    return /\n/.test(value) ||
+        value.replace(/\s+/g, ' ').length > MENU_COLLAPSE_CHAR_LIMIT;
+}
+
+function entryMessageText(entry) {
+    return [safeString(entry.title), safeString(entry.body)]
+        .filter(Boolean)
+        .join('\n');
+}
+
+function copyMessage(entry) {
+    // Copy just the notification's message body. Fall back to the title only
+    // when there is no body at all (e.g. title-only notifications).
+    const text = safeString(entry.body) || safeString(entry.title);
+    if (!text)
+        return;
+
+    St.Clipboard.get_default().set_text(St.ClipboardType.CLIPBOARD, text);
 }
 
 function formatTimestamp(timestamp) {
@@ -1025,6 +1208,20 @@ function createEntryLabel(params) {
     label.clutter_text.line_wrap = true;
     label.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
     return label;
+}
+
+function setLabelCollapsed(label, collapsed) {
+    const clutterText = label.clutter_text;
+    if (collapsed) {
+        clutterText.single_line_mode = true;
+        clutterText.line_wrap = false;
+        clutterText.ellipsize = Pango.EllipsizeMode.END;
+    } else {
+        clutterText.single_line_mode = false;
+        clutterText.line_wrap = true;
+        clutterText.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
+        clutterText.ellipsize = Pango.EllipsizeMode.NONE;
+    }
 }
 
 function getEntryLocalId(entry) {

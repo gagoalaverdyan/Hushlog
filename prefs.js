@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Adw from 'gi://Adw';
+import Gdk from 'gi://Gdk';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk';
@@ -28,8 +29,58 @@ export default class HushlogPreferences extends ExtensionPreferences {
         page.add(this._createGeneralGroup());
         page.add(this._createBlacklistGroup());
         page.add(this._createStorageGroup());
+        page.add(this._createAboutGroup());
 
         window.add(page);
+    }
+
+    _createAboutGroup() {
+        const group = new Adw.PreferencesGroup({
+            title: 'About & Credits',
+        });
+
+        group.add(this._createLinkRow(
+            'Report a bug',
+            'Open an issue on GitHub.',
+            'https://github.com/gagoalaverdyan/Hushlog/issues'
+        ));
+
+        group.add(this._createLinkRow(
+            'Inspired by Clipboard Indicator',
+            'Its UI and functionality informed Hushlog’s design.',
+            'https://github.com/Tudmotu/gnome-shell-extension-clipboard-indicator'
+        ));
+
+        group.add(new Adw.ActionRow({
+            title: 'Icons',
+            subtitle: 'From the Adwaita / freedesktop icon set, provided by your GNOME icon theme.',
+        }));
+
+        return group;
+    }
+
+    _createLinkRow(title, subtitle, uri) {
+        const row = new Adw.ActionRow({
+            title,
+            subtitle,
+            activatable: true,
+        });
+
+        row.add_suffix(new Gtk.Image({
+            icon_name: 'adw-external-link-symbolic',
+            valign: Gtk.Align.CENTER,
+        }));
+        row.connect('activated', () => this._openUri(uri));
+
+        return row;
+    }
+
+    _openUri(uri) {
+        try {
+            Gtk.show_uri(null, uri, Gdk.CURRENT_TIME);
+        } catch (error) {
+            console.error(`Hushlog: failed to open URL: ${error.message}`);
+        }
     }
 
     _createGeneralGroup() {
@@ -39,13 +90,47 @@ export default class HushlogPreferences extends ExtensionPreferences {
 
         group.add(this._createSpinRow(
             'Entries shown in menu',
-            'How many recent notifications to show before using Show all history.',
+            'How many recent notifications to show before opening the History view.',
             'menu-entry-limit',
             1,
             100
         ));
 
+        group.add(this._createPanelBoxRow());
+
+        group.add(this._createSpinRow(
+            'Panel position',
+            'Order within the panel section. Lower sits closer to the section’s inner edge.',
+            'panel-position',
+            0,
+            100
+        ));
+
         return group;
+    }
+
+    _createPanelBoxRow() {
+        const boxes = ['left', 'center', 'right'];
+        const row = new Adw.ComboRow({
+            title: 'Panel section',
+            subtitle: 'Which part of the top bar the icon sits in.',
+            model: Gtk.StringList.new(['Left', 'Center', 'Right']),
+        });
+
+        const current = this._settings.get_string('panel-box');
+        row.set_selected(Math.max(0, boxes.indexOf(current)));
+        row.connect('notify::selected', () => {
+            const value = boxes[row.get_selected()] ?? 'right';
+            if (this._settings.get_string('panel-box') !== value)
+                this._settings.set_string('panel-box', value);
+        });
+        this._settings.connect('changed::panel-box', () => {
+            const index = Math.max(0, boxes.indexOf(this._settings.get_string('panel-box')));
+            if (row.get_selected() !== index)
+                row.set_selected(index);
+        });
+
+        return row;
     }
 
     _createBlacklistGroup() {

@@ -4,5 +4,7 @@
   "description": "Local notification history for GNOME Shell",
   "shell-version": ["50"],
   "settings-schema": "org.gnome.shell.extensions.hushlog",
-  "url": "https://github.com/gagoalaverdyan/hushlog"
+  "url": "https://github.com/gagoalaverdyan/hushlog",
+  "version": 2,
+  "version-name": "0.2"
 }
