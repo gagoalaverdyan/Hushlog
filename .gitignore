@@ -1,0 +1,22 @@
+# GNOME extension build artifacts
+*.shell-extension.zip
+schemas/gschemas.compiled
+
+# Local runtime data
+.local/
+hushlog/
+history.jsonl
+
+# Local agent/workspace metadata
+.agents/
+.codex/
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+
+# Logs
+*.log

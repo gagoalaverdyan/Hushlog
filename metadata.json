@@ -1,0 +1,8 @@
+{
+  "uuid": "hushlog@gagoalaverdyan",
+  "name": "Hushlog",
+  "description": "Local notification history for GNOME Shell",
+  "shell-version": ["50"],
+  "settings-schema": "org.gnome.shell.extensions.hushlog",
+  "url": "https://github.com/gagoalaverdyan/hushlog"
+}

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<schemalist>
+  <schema id="org.gnome.shell.extensions.hushlog" path="/org/gnome/shell/extensions/hushlog/">
+    <key name="pause-logging" type="b">
+      <default>false</default>
+      <summary>Pause notification logging</summary>
+      <description>When enabled, Hushlog does not capture new notifications.</description>
+    </key>
+    <key name="denylist" type="as">
+      <default>['Signal', 'Authenticator', '1Password', 'Bitwarden', 'KeePassXC']</default>
+      <summary>Blocked application and source names</summary>
+      <description>Case-insensitive substrings that prevent matching notifications from being logged.</description>
+    </key>
+    <key name="menu-entry-limit" type="i">
+      <range min="1" max="100"/>
+      <default>20</default>
+      <summary>Menu entry limit</summary>
+      <description>Maximum number of recent notifications shown in the panel menu.</description>
+    </key>
+  </schema>
+</schemalist>

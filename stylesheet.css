@@ -1,0 +1,162 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
+.hushlog-panel-box {
+  transition: background-color 150ms ease-in-out;
+}
+
+.hushlog-panel-icon {
+  icon-size: 1.15em;
+  -st-icon-style: symbolic;
+  transition: opacity 150ms ease-in-out;
+}
+
+.hushlog-search-entry {
+  min-width: 350px;
+}
+
+.hushlog-history-scroll {
+  max-height: 450px;
+  min-width: 430px;
+}
+
+.hushlog-entry {
+  padding: 8px 10px;
+  margin: 2px 6px 2px 0;
+  border-radius: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hushlog-entry:hover,
+.hushlog-entry:focus {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.hushlog-entry:first-child {
+  border-top: 0;
+}
+
+.hushlog-entry-outer {
+  spacing: 10px;
+}
+
+.hushlog-entry-box {
+  max-width: 400px;
+}
+
+.hushlog-entry-header {
+  spacing: 8px;
+}
+
+.hushlog-app {
+  font-weight: bold;
+}
+
+.hushlog-time,
+.hushlog-body,
+.hushlog-empty {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.hushlog-title {
+  padding-top: 2px;
+}
+
+.hushlog-body {
+  padding-top: 2px;
+}
+
+.hushlog-entry-actions {
+  spacing: 3px;
+}
+
+.hushlog-entry-action {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 3px;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.hushlog-entry-action StIcon {
+  icon-size: 1em;
+}
+
+.hushlog-entry-action:hover,
+.hushlog-entry-action:focus {
+  color: rgba(255, 255, 255, 0.95);
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.hushlog-menu-icon {
+  width: 1em;
+  height: 1em;
+  margin-right: 0.5em;
+}
+
+.hushlog-empty-state {
+  width: 350px;
+  color: #aaa;
+}
+
+.hushlog-empty-state StIcon {
+  icon-size: 5em;
+  margin-top: 3em;
+}
+
+.hushlog-empty-state StLabel {
+  margin: 1em 0 3em 0;
+}
+
+.hushlog-history-dialog {
+  min-width: 680px;
+}
+
+.hushlog-dialog-title {
+  font-weight: bold;
+  font-size: 1.2em;
+  margin-bottom: 12px;
+}
+
+.hushlog-dialog-scroll {
+  min-height: 220px;
+  max-height: 560px;
+}
+
+.hushlog-dialog-list {
+  spacing: 0;
+}
+
+.hushlog-dialog-entry {
+  spacing: 10px;
+  padding: 10px 8px;
+  border-radius: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hushlog-dialog-entry:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.hushlog-dialog-entry:first-child {
+  border-top: 0;
+}
+
+.hushlog-dialog-empty {
+  color: rgba(255, 255, 255, 0.65);
+  margin: 32px 0;
+}
+
+.hushlog-confirm-box {
+  spacing: 12px;
+  min-width: 360px;
+  padding: 8px 4px;
+}
+
+.hushlog-confirm-title {
+  font-weight: bold;
+  font-size: 1.15em;
+}
+
+.hushlog-confirm-subtitle {
+  color: rgba(255, 255, 255, 0.65);
+}
