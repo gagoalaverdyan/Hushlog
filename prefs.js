@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Adw from 'gi://Adw';
-import Gdk from 'gi://Gdk';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk';
@@ -75,17 +74,9 @@ export default class HushlogPreferences extends ExtensionPreferences {
             icon_name: 'adw-external-link-symbolic',
             valign: Gtk.Align.CENTER,
         }));
-        row.connect('activated', () => this._openUri(uri));
+        row.connect('activated', () => Gio.AppInfo.launch_default_for_uri(uri, null));
 
         return row;
-    }
-
-    _openUri(uri) {
-        try {
-            Gtk.show_uri(null, uri, Gdk.CURRENT_TIME);
-        } catch (error) {
-            console.error(`Hushlog: failed to open URL: ${error.message}`);
-        }
     }
 
     _createGeneralGroup() {
@@ -122,15 +113,14 @@ export default class HushlogPreferences extends ExtensionPreferences {
             model: Gtk.StringList.new([_('Left'), _('Center'), _('Right')]),
         });
 
-        const current = this._settings.get_string('panel-box');
-        row.set_selected(Math.max(0, boxes.indexOf(current)));
+        row.set_selected(boxes.indexOf(this._settings.get_string('panel-box')));
         row.connect('notify::selected', () => {
-            const value = boxes[row.get_selected()] ?? 'right';
+            const value = boxes[row.get_selected()];
             if (this._settings.get_string('panel-box') !== value)
                 this._settings.set_string('panel-box', value);
         });
         const id = this._settings.connect('changed::panel-box', () => {
-            const index = Math.max(0, boxes.indexOf(this._settings.get_string('panel-box')));
+            const index = boxes.indexOf(this._settings.get_string('panel-box'));
             if (row.get_selected() !== index)
                 row.set_selected(index);
         });
@@ -307,34 +297,18 @@ export default class HushlogPreferences extends ExtensionPreferences {
     }
 
     _openLogFile() {
-        try {
-            const file = Gio.File.new_for_path(HISTORY_FILE);
-            Gio.AppInfo.launch_default_for_uri(file.get_uri(), null);
-        } catch (error) {
-            console.error(`Hushlog: failed to open log file: ${error.message}`);
-        }
+        const file = Gio.File.new_for_path(HISTORY_FILE);
+        Gio.AppInfo.launch_default_for_uri(file.get_uri(), null);
     }
 
     _clearHistory() {
-        try {
-            GLib.mkdir_with_parents(GLib.path_get_dirname(HISTORY_FILE), 0o700);
-            GLib.file_set_contents(HISTORY_FILE, '');
-        } catch (error) {
-            console.error(`Hushlog: failed to clear history: ${error.message}`);
-        }
+        GLib.mkdir_with_parents(GLib.path_get_dirname(HISTORY_FILE), 0o700);
+        GLib.file_set_contents(HISTORY_FILE, '');
     }
 
     _disconnectSettingsSignals() {
-        if (!this._settings || !this._settingsSignals)
-            return;
-
-        for (const id of this._settingsSignals) {
-            try {
-                this._settings.disconnect(id);
-            } catch (error) {
-                console.debug(`Hushlog: failed to disconnect prefs settings signal: ${error.message}`);
-            }
-        }
+        for (const id of this._settingsSignals)
+            this._settings.disconnect(id);
 
         this._settingsSignals = [];
     }

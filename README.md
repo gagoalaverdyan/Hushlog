@@ -46,7 +46,7 @@ You can edit the blacklist from Settings.
 
 ## Requirements
 
-- GNOME Shell 50 or newer
+- GNOME Shell 45-50
 - GJS / GNOME Shell extension support
 - `glib-compile-schemas`
 
@@ -175,7 +175,7 @@ The panel indicator is a `PanelMenu.Button` added with `Main.panel.addToStatusAr
 
 Notification capture uses `Main.messageTray`. Hushlog first tries the tray-level `notification-added` signal where available. It also watches newly added MessageTray sources, then listens for source-level `notification-added` and `notification-updated` signals when those are exposed.
 
-GNOME Shell MessageTray internals have changed across releases, so notification field access is intentionally defensive and signal connections are treated as optional. If Shell 50+ changes signal names again, the extension should still load and unload cleanly, but capture may need a small adapter update in `extension.js`.
+GNOME Shell MessageTray internals have changed across releases, so notification field access is intentionally defensive and signal connections are treated as optional. Hushlog targets GNOME Shell 45-50 with the modern ESM extension format. If Shell changes signal names again, the extension should still load and unload cleanly, but capture may need a small adapter update in `extension.js`.
 
 ## Credits
 

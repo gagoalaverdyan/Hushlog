@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Hushlog 0.2\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-06 16:24+0400\n"
+"POT-Creation-Date: 2026-07-08 13:09+0400\n"
 "PO-Revision-Date: 2026-07-06 16:00+0400\n"
 "Last-Translator: Gago Alaverdyan\n"
 "Language-Team: English\n"
@@ -15,125 +15,129 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension.js:118
+#: extension.js:116
 msgid "Search notifications..."
 msgstr "Search notifications..."
 
-#: extension.js:148 extension.js:464
+#: extension.js:144 extension.js:377
 msgid "History is empty"
 msgstr "History is empty"
 
-#: extension.js:158
+#: extension.js:154
 msgid "Private mode"
 msgstr "Private mode"
 
-#: extension.js:167
+#: extension.js:161
 msgid "Settings"
 msgstr "Settings"
 
-#: extension.js:176
+#: extension.js:170
 msgid "History"
 msgstr "History"
 
-#: extension.js:187
+#: extension.js:178
 msgid "Sweep"
 msgstr "Sweep"
 
-#: extension.js:194 prefs.js:211
+#: extension.js:185 prefs.js:201
 msgid "Clear history"
 msgstr "Clear history"
 
-#: extension.js:245 extension.js:517 extension.js:844
+#: extension.js:228 extension.js:471
 msgid "Unknown app"
 msgstr "Unknown app"
 
-#: extension.js:296 extension.js:573
-msgid "Copy message"
-msgstr "Copy message"
-
-#: extension.js:312 extension.js:589
-msgid "Delete notification from history"
-msgstr "Delete notification from history"
-
-#: extension.js:456
+#: extension.js:370
 msgid "Notification History"
 msgstr "Notification History"
 
-#: extension.js:489
+#: extension.js:401
 msgid "Close"
 msgstr "Close"
 
-#: extension.js:669
+#: extension.js:424
 msgid "Clear notification history?"
 msgstr "Clear notification history?"
 
-#: extension.js:674
+#: extension.js:429
 msgid "This cannot be undone."
 msgstr "This cannot be undone."
 
-#: extension.js:682
+#: extension.js:437
 msgid "Cancel"
 msgstr "Cancel"
 
-#: extension.js:687 prefs.js:215
+#: extension.js:442 prefs.js:205
 msgid "Clear"
 msgstr "Clear"
 
-#: prefs.js:23
+#: extension.js:745
+msgid "(untitled)"
+msgstr "(untitled)"
+
+#: extension.js:789
+msgid "Copy message"
+msgstr "Copy message"
+
+#: extension.js:798
+msgid "Delete notification from history"
+msgstr "Delete notification from history"
+
+#: prefs.js:22
 msgid "Hushlog Settings"
 msgstr "Hushlog Settings"
 
-#: prefs.js:30
+#: prefs.js:29
 msgid "Hushlog"
 msgstr "Hushlog"
 
-#: prefs.js:44
+#: prefs.js:43
 msgid "About & Credits"
 msgstr "About & Credits"
 
-#: prefs.js:48
+#: prefs.js:47
 msgid "Report a bug"
 msgstr "Report a bug"
 
-#: prefs.js:49
+#: prefs.js:48
 msgid "Open an issue on GitHub."
 msgstr "Open an issue on GitHub."
 
-#: prefs.js:54
+#: prefs.js:53
 msgid "Inspired by Clipboard Indicator"
 msgstr "Inspired by Clipboard Indicator"
 
-#: prefs.js:55
+#: prefs.js:54
 msgid "Its UI and functionality informed Hushlog's design."
 msgstr "Its UI and functionality informed Hushlog's design."
 
-#: prefs.js:60
+#: prefs.js:59
 msgid "Icons"
 msgstr "Icons"
 
-#: prefs.js:61
+#: prefs.js:60
 msgid ""
 "From the Adwaita / freedesktop icon set, provided by your GNOME icon theme."
 msgstr ""
 "From the Adwaita / freedesktop icon set, provided by your GNOME icon theme."
 
-#: prefs.js:93
+#: prefs.js:84
 msgid "General"
 msgstr "General"
 
-#: prefs.js:97
+#: prefs.js:88
 msgid "Entries shown in menu"
 msgstr "Entries shown in menu"
 
-#: prefs.js:98
+#: prefs.js:89
 msgid "How many recent notifications to show before opening the History view."
 msgstr "How many recent notifications to show before opening the History view."
 
-#: prefs.js:107
+#: prefs.js:98
 msgid "Panel position"
 msgstr "Panel position"
 
-#: prefs.js:108
+#: prefs.js:99
 msgid ""
 "Order within the panel section. Lower sits closer to the section's inner "
 "edge."
@@ -141,76 +145,76 @@ msgstr ""
 "Order within the panel section. Lower sits closer to the section's inner "
 "edge."
 
-#: prefs.js:120
+#: prefs.js:111
 msgid "Panel section"
 msgstr "Panel section"
 
-#: prefs.js:121
+#: prefs.js:112
 msgid "Which part of the top bar the icon sits in."
 msgstr "Which part of the top bar the icon sits in."
 
-#: prefs.js:122
+#: prefs.js:113
 msgid "Left"
 msgstr "Left"
 
-#: prefs.js:122
+#: prefs.js:113
 msgid "Center"
 msgstr "Center"
 
-#: prefs.js:122
+#: prefs.js:113
 msgid "Right"
 msgstr "Right"
 
-#: prefs.js:144
+#: prefs.js:134
 msgid "App blacklist"
 msgstr "App blacklist"
 
-#: prefs.js:145
+#: prefs.js:135
 msgid ""
 "Case-insensitive name fragments. Matching notifications stay out of the log."
 msgstr ""
 "Case-insensitive name fragments. Matching notifications stay out of the log."
 
-#: prefs.js:149
+#: prefs.js:139
 msgid "Add app or source name"
 msgstr "Add app or source name"
 
-#: prefs.js:154
+#: prefs.js:144
 msgid "Add"
 msgstr "Add"
 
-#: prefs.js:176
+#: prefs.js:166
 msgid "Storage"
 msgstr "Storage"
 
-#: prefs.js:180
+#: prefs.js:170
 msgid "Session only"
 msgstr "Session only"
 
-#: prefs.js:181
+#: prefs.js:171
 msgid "Keep new history in memory only."
 msgstr "Keep new history in memory only."
 
-#: prefs.js:192
+#: prefs.js:182
 msgid "Log file"
 msgstr "Log file"
 
-#: prefs.js:198
+#: prefs.js:188
 msgid "Open log file"
 msgstr "Open log file"
 
-#: prefs.js:202
+#: prefs.js:192
 msgid "Open"
 msgstr "Open"
 
-#: prefs.js:212
+#: prefs.js:202
 msgid "Delete all saved notification history."
 msgstr "Delete all saved notification history."
 
-#: prefs.js:277
+#: prefs.js:267
 msgid "No blocked apps"
 msgstr "No blocked apps"
 
-#: prefs.js:291
+#: prefs.js:281
 msgid "Remove"
 msgstr "Remove"

@@ -1,8 +1,8 @@
 {
   "uuid": "hushlog@gagoalaverdyan",
   "name": "Hushlog",
-  "description": "Local notification history for GNOME Shell",
-  "shell-version": ["50"],
+  "description": "Local notification history for GNOME Shell. Includes a user-triggered action to copy notification text to the clipboard.",
+  "shell-version": ["45", "46", "47", "48", "49", "50"],
   "settings-schema": "org.gnome.shell.extensions.hushlog",
   "gettext-domain": "hushlog",
   "url": "https://github.com/gagoalaverdyan/hushlog"

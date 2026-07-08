@@ -63,8 +63,7 @@
 }
 
 .hushlog-time,
-.hushlog-body,
-.hushlog-empty {
+.hushlog-body {
   color: rgba(255, 255, 255, 0.65);
 }
 
