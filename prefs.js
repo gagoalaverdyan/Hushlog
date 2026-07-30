@@ -22,6 +22,9 @@ export default class HushlogPreferences extends ExtensionPreferences {
         window.set_title(_('Hushlog Settings'));
         window.connect('close-request', () => {
             this._disconnectSettingsSignals();
+            this._settings = null;
+            this._blacklistRows = [];
+            this._blacklistGroup = null;
             return false;
         });
 

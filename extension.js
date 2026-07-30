@@ -120,10 +120,10 @@ class HushlogIndicator extends PanelMenu.Button {
             primary_icon: new St.Icon({icon_name: 'edit-find-symbolic'}),
         });
 
-        this._searchEntry.clutter_text.connect('text-changed', () => {
+        this._searchEntry.clutter_text.connectObject('text-changed', () => {
             this._searchText = this._searchEntry.get_text().toLocaleLowerCase();
             this._applySearchFilter();
-        });
+        }, this);
 
         searchItem.add_child(this._searchEntry);
         this.menu.addMenuItem(searchItem);
@@ -155,12 +155,12 @@ class HushlogIndicator extends PanelMenu.Button {
             this._extension.paused
         );
         pauseItem.insert_child_at_index(createMenuIcon('security-medium-symbolic'), 0);
-        pauseItem.connect('toggled', (item, state) => this._extension.setPaused(state));
+        pauseItem.connectObject('toggled', (item, state) => this._extension.setPaused(state), this);
         this.menu.addMenuItem(pauseItem);
 
         const prefsItem = new PopupMenu.PopupMenuItem(_('Settings'));
         prefsItem.insert_child_at_index(createMenuIcon('preferences-system-symbolic'), 0);
-        prefsItem.connect('activate', () => this._extension.openPreferences());
+        prefsItem.connectObject('activate', () => this._extension.openPreferences(), this);
 
         if (pausedOnly) {
             this.menu.addMenuItem(prefsItem);
@@ -169,7 +169,7 @@ class HushlogIndicator extends PanelMenu.Button {
 
         const historyItem = new PopupMenu.PopupMenuItem(_('History'));
         historyItem.insert_child_at_index(createMenuIcon('view-list-symbolic'), 0);
-        historyItem.connect('activate', () => this._extension.openHistoryDialog());
+        historyItem.connectObject('activate', () => this._extension.openHistoryDialog(), this);
         this.menu.addMenuItem(historyItem);
 
         this.menu.addMenuItem(prefsItem);
@@ -177,14 +177,14 @@ class HushlogIndicator extends PanelMenu.Button {
         if (this._extension.displayedHistory.length > 0) {
             const sweepItem = new PopupMenu.PopupMenuItem(_('Sweep'));
             sweepItem.insert_child_at_index(createMenuIcon('edit-clear-all-symbolic'), 0);
-            sweepItem.connect('activate', () => this._extension.sweepHistory());
+            sweepItem.connectObject('activate', () => this._extension.sweepHistory(), this);
             this.menu.addMenuItem(sweepItem);
         }
 
         if (this._extension.recentHistory.length > 0) {
             const clearItem = new PopupMenu.PopupMenuItem(_('Clear history'));
             clearItem.insert_child_at_index(createMenuIcon('user-trash-symbolic'), 0);
-            clearItem.connect('activate', () => this._extension.confirmClearHistory());
+            clearItem.connectObject('activate', () => this._extension.confirmClearHistory(), this);
             this.menu.addMenuItem(clearItem);
         }
     }
@@ -261,9 +261,7 @@ class HushlogEntryMenuItem extends PopupMenu.PopupBaseMenuItem {
 export default class HushlogExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
-        this._settingsSignals = [];
-        this._traySignals = [];
-        this._sourceSignals = new Map();
+        this._sources = new Set();
 
         this.recentHistory = [];
         this.sweepBefore = '';
@@ -271,23 +269,19 @@ export default class HushlogExtension extends Extension {
 
         this._loadSettings();
         this._connectSettings();
-        this._loadHistory();
         this._addIndicator();
+        this._loadHistory();
         this._connectMessageTray();
     }
 
     disable() {
-        for (const [object, id] of this._traySignals)
-            object.disconnect(id);
-        this._traySignals = [];
+        Main.messageTray.disconnectObject(this);
 
-        for (const [source, id] of this._sourceSignals)
-            source.disconnect(id);
-        this._sourceSignals.clear();
+        for (const source of this._sources)
+            source.disconnectObject(this);
+        this._sources.clear();
 
-        for (const id of this._settingsSignals)
-            this._settings.disconnect(id);
-        this._settingsSignals = [];
+        this._settings.disconnectObject(this);
 
         if (this._historyDialog) {
             this._historyDialog.close();
@@ -337,13 +331,16 @@ export default class HushlogExtension extends Extension {
         this._refreshIndicator();
     }
 
-    deleteHistoryEntry(entry) {
+    async deleteHistoryEntry(entry) {
         if (this.sessionOnly) {
             this.recentHistory = this.recentHistory
                 .filter(item => item.localId !== entry.localId);
         } else {
-            const entries = readHistoryEntries()
+            const entries = (await readHistoryEntries())
                 .filter(item => item.localId !== entry.localId);
+            if (!this._settings || this.sessionOnly)
+                return;
+
             this._writeHistoryEntries(entries);
             this.recentHistory = entries.reverse().slice(0, RECENT_MEMORY_LIMIT);
         }
@@ -351,16 +348,20 @@ export default class HushlogExtension extends Extension {
         this._refreshIndicator();
     }
 
-    openHistoryDialog() {
+    async openHistoryDialog() {
         if (this._historyDialog)
             this._historyDialog.close();
 
+        const entries = await this._historyEntriesNewestFirst();
+        if (!this._settings)
+            return;
+
         const dialog = new ModalDialog.ModalDialog({destroyOnClose: true});
         this._historyDialog = dialog;
-        dialog.connect('closed', () => {
+        dialog.connectObject('closed', () => {
             if (this._historyDialog === dialog)
                 this._historyDialog = null;
-        });
+        }, this);
 
         const root = new St.BoxLayout({
             vertical: true,
@@ -371,7 +372,6 @@ export default class HushlogExtension extends Extension {
             style_class: 'hushlog-dialog-title',
         }));
 
-        const entries = this._historyEntriesNewestFirst();
         if (entries.length === 0) {
             root.add_child(new St.Label({
                 text: _('History is empty'),
@@ -411,10 +411,10 @@ export default class HushlogExtension extends Extension {
 
         const dialog = new ModalDialog.ModalDialog({destroyOnClose: true});
         this._confirmDialog = dialog;
-        dialog.connect('closed', () => {
+        dialog.connectObject('closed', () => {
             if (this._confirmDialog === dialog)
                 this._confirmDialog = null;
-        });
+        }, this);
 
         const messageBox = new St.BoxLayout({
             vertical: true,
@@ -484,11 +484,11 @@ export default class HushlogExtension extends Extension {
         // Clicking the row expands/collapses long content in place.
         if (isLongEntry(entry)) {
             let expanded = false;
-            row.connect('button-release-event', () => {
+            row.connectObject('button-release-event', () => {
                 expanded = !expanded;
                 setEntryLabelsCollapsed(titleLabel, bodyLabel, !expanded);
                 return Clutter.EVENT_STOP;
-            });
+            }, row);
         }
 
         row.add_child(createEntryActions(entry, () => {
@@ -499,11 +499,11 @@ export default class HushlogExtension extends Extension {
         return row;
     }
 
-    _historyEntriesNewestFirst() {
+    async _historyEntriesNewestFirst() {
         if (this.sessionOnly)
             return this.recentHistory.slice();
 
-        return readHistoryEntries().reverse();
+        return (await readHistoryEntries()).reverse();
     }
 
     _addIndicator() {
@@ -528,34 +528,29 @@ export default class HushlogExtension extends Extension {
     _connectMessageTray() {
         const tray = Main.messageTray;
 
-        this._connectTray(tray, 'source-added', (obj, source) => this._watchSource(source));
-        this._connectTray(tray, 'source-removed', (obj, source) => this._unwatchSource(source));
+        tray.connectObject('source-added', (obj, source) => this._watchSource(source), this);
+        tray.connectObject('source-removed', (obj, source) => this._unwatchSource(source), this);
 
         for (const source of tray.getSources())
             this._watchSource(source);
     }
 
-    _connectTray(object, signal, callback) {
-        this._traySignals.push([object, object.connect(signal, callback)]);
-    }
-
     _watchSource(source) {
-        if (this._sourceSignals.has(source))
+        if (this._sources.has(source))
             return;
 
-        const id = source.connect('notification-added', (obj, notification) => {
+        source.connectObject('notification-added', (obj, notification) => {
             this._captureNotification(notification, obj);
-        });
-        this._sourceSignals.set(source, id);
+        }, this);
+        this._sources.add(source);
     }
 
     _unwatchSource(source) {
-        const id = this._sourceSignals.get(source);
-        if (id === undefined)
+        if (!this._sources.has(source))
             return;
 
-        source.disconnect(id);
-        this._sourceSignals.delete(source);
+        source.disconnectObject(this);
+        this._sources.delete(source);
     }
 
     _captureNotification(notification, source) {
@@ -594,8 +589,11 @@ export default class HushlogExtension extends Extension {
             this._trimHistoryFile();
     }
 
-    _trimHistoryFile() {
-        const entries = readHistoryEntries();
+    async _trimHistoryFile() {
+        const entries = await readHistoryEntries();
+        if (!this._settings || this.sessionOnly)
+            return;
+
         if (entries.length > MAX_HISTORY_ENTRIES)
             this._writeHistoryEntries(entries.slice(-MAX_HISTORY_ENTRIES));
         else
@@ -608,42 +606,45 @@ export default class HushlogExtension extends Extension {
         this._historyLineCount = entries.length;
     }
 
-    _loadHistory() {
-        if (this.sessionOnly)
+    async _loadHistory() {
+        if (this.sessionOnly) {
+            this._refreshIndicator();
+            return;
+        }
+
+        const entries = await readHistoryEntries();
+        if (!this._settings || this.sessionOnly)
             return;
 
-        const entries = readHistoryEntries();
         this._historyLineCount = entries.length;
         this.recentHistory = entries.reverse().slice(0, RECENT_MEMORY_LIMIT);
 
         if (this._historyLineCount > MAX_HISTORY_ENTRIES + HISTORY_TRIM_BUFFER)
             this._trimHistoryFile();
+
+        this._refreshIndicator();
     }
 
     _connectSettings() {
         for (const key of ['pause-logging', 'denylist', 'menu-entry-limit']) {
-            const id = this._settings.connect(`changed::${key}`, () => {
+            this._settings.connectObject(`changed::${key}`, () => {
                 this._loadSettings();
                 this._refreshIndicator();
-            });
-            this._settingsSignals.push(id);
+            }, this);
         }
 
-        const sessionOnlyId = this._settings.connect('changed::session-only', () => {
+        this._settings.connectObject('changed::session-only', () => {
             this._loadSettings();
             this.recentHistory = [];
             this._historyLineCount = 0;
             this._loadHistory();
-            this._refreshIndicator();
-        });
-        this._settingsSignals.push(sessionOnlyId);
+        }, this);
 
         for (const key of ['panel-box', 'panel-position']) {
-            const id = this._settings.connect(`changed::${key}`, () => {
+            this._settings.connectObject(`changed::${key}`, () => {
                 this._loadSettings();
                 this._relocateIndicator();
-            });
-            this._settingsSignals.push(id);
+            }, this);
         }
     }
 
@@ -666,12 +667,29 @@ function writeHistoryFile(text) {
     GLib.chmod(HISTORY_FILE, 0o600);
 }
 
-function readHistoryEntries() {
+async function readHistoryEntries() {
     const file = Gio.File.new_for_path(HISTORY_FILE);
-    if (!file.query_exists(null))
+    let contents;
+    try {
+        [, contents] = await new Promise((resolve, reject) => {
+            file.load_contents_async(null, (object, result) => {
+                try {
+                    resolve(object.load_contents_finish(result));
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        });
+    } catch (error) {
+        if (error.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND))
+            return [];
+
+        throw error;
+    }
+
+    if (!contents)
         return [];
 
-    const [, contents] = file.load_contents(null);
     return new TextDecoder().decode(contents)
         .split('\n')
         .filter(line => line !== '')
@@ -787,9 +805,9 @@ function createEntryActions(entry, onDelete) {
 
     if (entryMessage(entry)) {
         const copyButton = createActionButton('edit-copy-symbolic', _('Copy message'));
-        copyButton.connect('clicked', () => {
+        copyButton.connectObject('clicked', () => {
             St.Clipboard.get_default().set_text(St.ClipboardType.CLIPBOARD, entryMessage(entry));
-        });
+        }, actionsBox);
         actionsBox.add_child(copyButton);
     }
 
@@ -797,7 +815,7 @@ function createEntryActions(entry, onDelete) {
         'edit-delete-symbolic',
         _('Delete notification from history')
     );
-    deleteButton.connect('clicked', onDelete);
+    deleteButton.connectObject('clicked', onDelete, actionsBox);
     actionsBox.add_child(deleteButton);
 
     return actionsBox;
