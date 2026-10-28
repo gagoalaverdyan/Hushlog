@@ -27,12 +27,12 @@
   padding: 8px 10px;
   margin: 2px 0;
   border-radius: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(127, 127, 127, 0.18);
 }
 
 .hushlog-entry:hover,
 .hushlog-entry:focus {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(127, 127, 127, 0.12);
 }
 
 .hushlog-entry:first-child {
@@ -64,7 +64,7 @@
 
 .hushlog-time,
 .hushlog-body {
-  color: rgba(255, 255, 255, 0.65);
+  opacity: 0.65;
 }
 
 .hushlog-title {
@@ -84,7 +84,7 @@
   min-height: 24px;
   padding: 3px;
   border-radius: 4px;
-  color: rgba(255, 255, 255, 0.55);
+  opacity: 0.75;
 }
 
 .hushlog-entry-action StIcon {
@@ -93,8 +93,8 @@
 
 .hushlog-entry-action:hover,
 .hushlog-entry-action:focus {
-  color: rgba(255, 255, 255, 0.95);
-  background-color: rgba(255, 255, 255, 0.12);
+  background-color: rgba(127, 127, 127, 0.16);
+  opacity: 1;
 }
 
 .hushlog-menu-icon {
@@ -105,7 +105,7 @@
 
 .hushlog-empty-state {
   width: 350px;
-  color: #aaa;
+  opacity: 0.65;
 }
 
 .hushlog-empty-state StIcon {
@@ -141,11 +141,11 @@
   spacing: 10px;
   padding: 10px 8px;
   border-radius: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(127, 127, 127, 0.2);
 }
 
 .hushlog-dialog-entry:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(127, 127, 127, 0.12);
 }
 
 .hushlog-dialog-entry:first-child {
@@ -153,7 +153,7 @@
 }
 
 .hushlog-dialog-empty {
-  color: rgba(255, 255, 255, 0.65);
+  opacity: 0.65;
   margin: 32px 0;
 }
 
@@ -169,5 +169,5 @@
 }
 
 .hushlog-confirm-subtitle {
-  color: rgba(255, 255, 255, 0.65);
+  opacity: 0.65;
 }

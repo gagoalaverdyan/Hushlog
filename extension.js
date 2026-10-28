@@ -133,7 +133,7 @@ class HushlogIndicator extends PanelMenu.Button {
         const section = new PopupMenu.PopupMenuSection();
         const emptyState = new St.BoxLayout({
             style_class: 'hushlog-empty-state',
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
         });
         emptyState.add_child(new St.Icon({
             icon_name: 'preferences-system-notifications-symbolic',
@@ -215,7 +215,7 @@ class HushlogEntryMenuItem extends PopupMenu.PopupBaseMenuItem {
         outerBox.add_child(createAppIcon(entry));
 
         const textBox = new St.BoxLayout({
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
             style_class: 'hushlog-entry-box',
         });
@@ -262,6 +262,8 @@ export default class HushlogExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
         this._sources = new Set();
+        this._historyGeneration = (this._historyGeneration ?? 0) + 1;
+        this._historyOperations ??= Promise.resolve();
 
         this.recentHistory = [];
         this.sweepBefore = '';
@@ -275,6 +277,7 @@ export default class HushlogExtension extends Extension {
     }
 
     disable() {
+        this._historyGeneration++;
         Main.messageTray.disconnectObject(this);
 
         for (const source of this._sources)
@@ -324,28 +327,40 @@ export default class HushlogExtension extends Extension {
         this._historyLineCount = 0;
 
         if (!this.sessionOnly) {
-            ensureStorageDir();
-            writeHistoryFile('');
+            this._queueHistoryOperation(async () => {
+                this.recentHistory = [];
+                this.sweepBefore = '';
+                this._historyLineCount = 0;
+                ensureStorageDir();
+                await writeHistoryFile('');
+                if (this._settings)
+                    this._refreshIndicator();
+            });
         }
 
         this._refreshIndicator();
     }
 
-    async deleteHistoryEntry(entry) {
-        if (this.sessionOnly) {
-            this.recentHistory = this.recentHistory
-                .filter(item => item.localId !== entry.localId);
-        } else {
-            const entries = (await readHistoryEntries())
-                .filter(item => item.localId !== entry.localId);
-            if (!this._settings || this.sessionOnly)
-                return;
+    deleteHistoryEntry(entry) {
+        return this._queueHistoryOperation(async () => {
+            if (this.sessionOnly) {
+                this.recentHistory = this.recentHistory
+                    .filter(item => item.localId !== entry.localId);
+            } else {
+                const entries = (await readHistoryEntries())
+                    .filter(item => item.localId !== entry.localId);
+                if (!this._settings || this.sessionOnly)
+                    return;
 
-            this._writeHistoryEntries(entries);
-            this.recentHistory = entries.reverse().slice(0, RECENT_MEMORY_LIMIT);
-        }
+                await this._writeHistoryEntries(entries);
+                if (!this._settings)
+                    return;
 
-        this._refreshIndicator();
+                this.recentHistory = entries.reverse().slice(0, RECENT_MEMORY_LIMIT);
+            }
+
+            this._refreshIndicator();
+        });
     }
 
     async openHistoryDialog() {
@@ -364,7 +379,7 @@ export default class HushlogExtension extends Extension {
         }, this);
 
         const root = new St.BoxLayout({
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
             style_class: 'hushlog-history-dialog',
         });
         root.add_child(new St.Label({
@@ -380,7 +395,7 @@ export default class HushlogExtension extends Extension {
             }));
         } else {
             const list = new St.BoxLayout({
-                vertical: true,
+                orientation: Clutter.Orientation.VERTICAL,
                 style_class: 'hushlog-dialog-list',
             });
             for (const entry of entries)
@@ -417,7 +432,7 @@ export default class HushlogExtension extends Extension {
         }, this);
 
         const messageBox = new St.BoxLayout({
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
             style_class: 'hushlog-confirm-box',
         });
         messageBox.add_child(new St.Label({
@@ -459,7 +474,7 @@ export default class HushlogExtension extends Extension {
         row.add_child(createAppIcon(entry));
 
         const textBox = new St.BoxLayout({
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
 
@@ -484,11 +499,10 @@ export default class HushlogExtension extends Extension {
         // Clicking the row expands/collapses long content in place.
         if (isLongEntry(entry)) {
             let expanded = false;
-            row.connectObject('button-release-event', () => {
+            addEntryExpansionAction(row, () => {
                 expanded = !expanded;
                 setEntryLabelsCollapsed(titleLabel, bodyLabel, !expanded);
-                return Clutter.EVENT_STOP;
-            }, row);
+            });
         }
 
         row.add_child(createEntryActions(entry, () => {
@@ -500,10 +514,12 @@ export default class HushlogExtension extends Extension {
     }
 
     async _historyEntriesNewestFirst() {
-        if (this.sessionOnly)
-            return this.recentHistory.slice();
+        return this._queueHistoryOperation(async () => {
+            if (this.sessionOnly)
+                return this.recentHistory.slice();
 
-        return (await readHistoryEntries()).reverse();
+            return (await readHistoryEntries()).reverse();
+        });
     }
 
     _addIndicator() {
@@ -577,16 +593,31 @@ export default class HushlogExtension extends Extension {
         if (this.sessionOnly)
             return;
 
-        ensureStorageDir();
+        this._queueHistoryOperation(async () => {
+            if (!this._settings || this.sessionOnly)
+                return;
 
-        const stream = Gio.File.new_for_path(HISTORY_FILE)
-            .append_to(Gio.FileCreateFlags.PRIVATE, null);
-        stream.write_all(new TextEncoder().encode(`${JSON.stringify(entry)}\n`), null);
-        stream.close(null);
+            ensureStorageDir();
+            await appendHistoryEntry(entry);
 
-        this._historyLineCount++;
-        if (this._historyLineCount > MAX_HISTORY_ENTRIES + HISTORY_TRIM_BUFFER)
-            this._trimHistoryFile();
+            this._historyLineCount++;
+            if (this._historyLineCount > MAX_HISTORY_ENTRIES + HISTORY_TRIM_BUFFER)
+                await this._trimHistoryFile();
+        });
+    }
+
+    _queueHistoryOperation(operation) {
+        const generation = this._historyGeneration;
+        const task = this._historyOperations.then(async () => {
+            if (generation !== this._historyGeneration)
+                return undefined;
+
+            return operation();
+        });
+        this._historyOperations = task.catch(error => {
+            logError(error, 'Failed to update Hushlog history');
+        });
+        return task;
     }
 
     async _trimHistoryFile() {
@@ -595,34 +626,36 @@ export default class HushlogExtension extends Extension {
             return;
 
         if (entries.length > MAX_HISTORY_ENTRIES)
-            this._writeHistoryEntries(entries.slice(-MAX_HISTORY_ENTRIES));
+            await this._writeHistoryEntries(entries.slice(-MAX_HISTORY_ENTRIES));
         else
             this._historyLineCount = entries.length;
     }
 
-    _writeHistoryEntries(entries) {
+    async _writeHistoryEntries(entries) {
         ensureStorageDir();
-        writeHistoryFile(entries.map(entry => `${JSON.stringify(entry)}\n`).join(''));
+        await writeHistoryFile(entries.map(entry => `${JSON.stringify(entry)}\n`).join(''));
         this._historyLineCount = entries.length;
     }
 
-    async _loadHistory() {
-        if (this.sessionOnly) {
+    _loadHistory() {
+        return this._queueHistoryOperation(async () => {
+            if (this.sessionOnly) {
+                this._refreshIndicator();
+                return;
+            }
+
+            const entries = await readHistoryEntries();
+            if (!this._settings || this.sessionOnly)
+                return;
+
+            this._historyLineCount = entries.length;
+            this.recentHistory = entries.reverse().slice(0, RECENT_MEMORY_LIMIT);
+
+            if (this._historyLineCount > MAX_HISTORY_ENTRIES + HISTORY_TRIM_BUFFER)
+                await this._trimHistoryFile();
+
             this._refreshIndicator();
-            return;
-        }
-
-        const entries = await readHistoryEntries();
-        if (!this._settings || this.sessionOnly)
-            return;
-
-        this._historyLineCount = entries.length;
-        this.recentHistory = entries.reverse().slice(0, RECENT_MEMORY_LIMIT);
-
-        if (this._historyLineCount > MAX_HISTORY_ENTRIES + HISTORY_TRIM_BUFFER)
-            this._trimHistoryFile();
-
-        this._refreshIndicator();
+        });
     }
 
     _connectSettings() {
@@ -638,6 +671,10 @@ export default class HushlogExtension extends Extension {
             this.recentHistory = [];
             this._historyLineCount = 0;
             this._loadHistory();
+        }, this);
+
+        this._settings.connectObject('changed::history-revision', () => {
+            this.clearHistory();
         }, this);
 
         for (const key of ['panel-box', 'panel-position']) {
@@ -662,9 +699,74 @@ function ensureStorageDir() {
     GLib.mkdir_with_parents(HISTORY_DIR, 0o700);
 }
 
-function writeHistoryFile(text) {
-    GLib.file_set_contents(HISTORY_FILE, text);
+async function writeHistoryFile(text) {
+    const file = Gio.File.new_for_path(HISTORY_FILE);
+    const contents = new TextEncoder().encode(text);
+    await new Promise((resolve, reject) => {
+        file.replace_contents_async(
+            contents,
+            null,
+            false,
+            Gio.FileCreateFlags.PRIVATE,
+            null,
+            (object, result) => {
+                try {
+                    object.replace_contents_finish(result);
+                    resolve();
+                } catch (error) {
+                    reject(error);
+                }
+            }
+        );
+    });
     GLib.chmod(HISTORY_FILE, 0o600);
+}
+
+async function appendHistoryEntry(entry) {
+    const file = Gio.File.new_for_path(HISTORY_FILE);
+    const stream = await new Promise((resolve, reject) => {
+        file.append_to_async(
+            Gio.FileCreateFlags.PRIVATE,
+            GLib.PRIORITY_DEFAULT,
+            null,
+            (object, result) => {
+                try {
+                    resolve(object.append_to_finish(result));
+                } catch (error) {
+                    reject(error);
+                }
+            }
+        );
+    });
+
+    try {
+        await new Promise((resolve, reject) => {
+            stream.write_all_async(
+                new TextEncoder().encode(`${JSON.stringify(entry)}\n`),
+                GLib.PRIORITY_DEFAULT,
+                null,
+                (object, result) => {
+                    try {
+                        object.write_all_finish(result);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                }
+            );
+        });
+    } finally {
+        await new Promise((resolve, reject) => {
+            stream.close_async(GLib.PRIORITY_DEFAULT, null, (object, result) => {
+                try {
+                    object.close_finish(result);
+                    resolve();
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        });
+    }
 }
 
 async function readHistoryEntries() {
@@ -701,10 +803,26 @@ async function readHistoryEntries() {
 // expected input rather than a programming error: skip it and keep the rest.
 function parseHistoryLine(line) {
     try {
-        return JSON.parse(line);
+        const entry = JSON.parse(line);
+        if (!isValidHistoryEntry(entry))
+            return null;
+
+        return entry;
     } catch {
         return null;
     }
+}
+
+function isValidHistoryEntry(entry) {
+    return entry !== null &&
+        typeof entry === 'object' &&
+        typeof entry.localId === 'string' &&
+        typeof entry.timestamp === 'string' &&
+        !Number.isNaN(Date.parse(entry.timestamp)) &&
+        typeof entry.appName === 'string' &&
+        (entry.icon === null || typeof entry.icon === 'string') &&
+        typeof entry.title === 'string' &&
+        typeof entry.body === 'string';
 }
 
 function entryFromNotification(notification, source) {
@@ -737,10 +855,15 @@ function createAppIcon(entry) {
         y_align: Clutter.ActorAlign.START,
     });
 
-    if (entry.icon)
-        icon.gicon = Gio.icon_new_for_string(entry.icon);
-    else
+    if (entry.icon) {
+        try {
+            icon.gicon = Gio.icon_new_for_string(entry.icon);
+        } catch {
+            icon.icon_name = 'preferences-system-notifications-symbolic';
+        }
+    } else {
         icon.icon_name = 'preferences-system-notifications-symbolic';
+    }
 
     return icon;
 }
@@ -751,6 +874,20 @@ function createMenuIcon(iconName) {
         style_class: 'hushlog-menu-icon',
         y_align: Clutter.ActorAlign.CENTER,
     });
+}
+
+function addEntryExpansionAction(row, callback) {
+    if (Clutter.ClickGesture) {
+        const gesture = new Clutter.ClickGesture();
+        gesture.connectObject('recognize', callback, row);
+        row.add_action(gesture);
+        return;
+    }
+
+    row.connectObject('button-release-event', () => {
+        callback();
+        return Clutter.EVENT_STOP;
+    }, row);
 }
 
 // Renders the title and body rows, collapsed to one line each. A title-only or
@@ -799,7 +936,7 @@ function setLabelCollapsed(label, collapsed) {
 
 function createEntryActions(entry, onDelete) {
     const actionsBox = new St.BoxLayout({
-        y_align: Clutter.ActorAlign.CENTER,
+        y_align: Clutter.ActorAlign.START,
         style_class: 'hushlog-entry-actions',
     });
 

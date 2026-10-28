@@ -307,6 +307,10 @@ export default class HushlogPreferences extends ExtensionPreferences {
     _clearHistory() {
         GLib.mkdir_with_parents(GLib.path_get_dirname(HISTORY_FILE), 0o700);
         GLib.file_set_contents(HISTORY_FILE, '');
+        this._settings.set_uint(
+            'history-revision',
+            (this._settings.get_uint('history-revision') + 1) >>> 0
+        );
     }
 
     _disconnectSettingsSignals() {

@@ -23,6 +23,11 @@
       <summary>Session-only history</summary>
       <description>When enabled, notification history is kept in memory for the current GNOME Shell session and is not written to disk.</description>
     </key>
+    <key name="history-revision" type="u">
+      <default>0</default>
+      <summary>History revision</summary>
+      <description>Increments when saved history is cleared outside GNOME Shell.</description>
+    </key>
     <key name="panel-box" type="s">
       <choices>
         <choice value="left"/>
